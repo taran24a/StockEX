@@ -18,6 +18,10 @@ import { ConflictError, NotFoundError, UnprocessableEntityError } from "../servi
 import { OrderBook } from "../engine/order-book.js";
 import type { Fill, OrderSide, OrderState } from "../engine/order-book.js";
 import { calculateBuyReservation, calculateFillFee } from "../engine/order-finance.js";
+import {
+  calculatePositionAfterBuy,
+  calculatePositionAfterSell
+} from "../services/portfolio-calculations.js";
 
 const IdParamsSchema = z.object({ id: z.uuid() });
 const IdempotencyKeySchema = z.string().trim().min(1).max(128);
@@ -135,15 +139,28 @@ async function ledger(
   fillId: string | null,
   type: "reserve" | "release" | "trade_debit" | "trade_credit" | "fee",
   amount: number,
-  balanceAfter: number
+  balanceAfter: number,
+  realizedPnlPaise = 0
 ): Promise<void> {
   if (amount === 0) {
     return;
   }
+  const holdingsValue = await client.query<{ market_value: string | number }>(
+    `SELECT COALESCE(SUM(position.quantity * instrument.last_price), 0) AS market_value
+     FROM positions AS position
+     JOIN instruments AS instrument ON instrument.id = position.instrument_id
+     WHERE position.account_id = $1`,
+    [accountId]
+  );
+  const equityAfter = safeMoney(
+    BigInt(balanceAfter) + BigInt(databaseInteger(holdingsValue.rows[0]?.market_value ?? 0, "holdings market value")),
+    "Portfolio equity snapshot"
+  );
   await client.query(
-    `INSERT INTO ledger_entries (account_id, fill_id, entry_type, amount, balance_after)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [accountId, fillId, type, amount, balanceAfter]
+    `INSERT INTO ledger_entries
+       (account_id, fill_id, entry_type, amount, balance_after, equity_after, realized_pnl_paise)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [accountId, fillId, type, amount, balanceAfter, equityAfter, realizedPnlPaise]
   );
 }
 
@@ -163,7 +180,7 @@ async function updatePosition(
   side: OrderSide,
   quantity: number,
   pricePaise: number
-): Promise<void> {
+): Promise<number> {
   const existing = await client.query<{ quantity: string | number; avg_cost: string | number }>(
     `SELECT quantity, avg_cost FROM positions
      WHERE account_id = $1 AND instrument_id = $2 FOR UPDATE`,
@@ -171,10 +188,16 @@ async function updatePosition(
   );
   const row = existing.rows[0];
   if (side === "buy") {
-    const oldQuantity = row === undefined ? 0 : databaseInteger(row.quantity, "position quantity");
-    const oldCost = row === undefined ? 0 : databaseInteger(row.avg_cost, "position average cost");
-    const nextQuantity = BigInt(oldQuantity) + BigInt(quantity);
-    const nextCost = (BigInt(oldQuantity) * BigInt(oldCost) + BigInt(quantity) * BigInt(pricePaise) + nextQuantity / 2n) / nextQuantity;
+    const nextPosition = calculatePositionAfterBuy(
+      row === undefined
+        ? null
+        : {
+            quantity: databaseInteger(row.quantity, "position quantity"),
+            averageCostPaise: databaseInteger(row.avg_cost, "position average cost")
+          },
+      quantity,
+      pricePaise
+    );
     await client.query(
       `INSERT INTO positions
          (user_id, symbol, quantity, average_cost_paise, account_id, instrument_id, avg_cost)
@@ -183,25 +206,29 @@ async function updatePosition(
        SET quantity = EXCLUDED.quantity,
            average_cost_paise = EXCLUDED.average_cost_paise,
            avg_cost = EXCLUDED.avg_cost`,
-      [userId, symbol, safeMoney(nextQuantity, "Position quantity"), safeMoney(nextCost, "Average position cost"), accountId, instrumentId]
+      [userId, symbol, nextPosition.quantity, nextPosition.averageCostPaise, accountId, instrumentId]
     );
-    return;
+    return 0;
   }
 
   if (row === undefined || databaseInteger(row.quantity, "position quantity") < quantity) {
     throw new UnprocessableEntityError("Insufficient unreserved shares to fill sell order", "INSUFFICIENT_SHARES");
   }
-  const nextQuantity = databaseInteger(row.quantity, "position quantity") - quantity;
-  if (nextQuantity === 0) {
+  const nextPosition = calculatePositionAfterSell({
+    quantity: databaseInteger(row.quantity, "position quantity"),
+    averageCostPaise: databaseInteger(row.avg_cost, "position average cost")
+  }, quantity, pricePaise);
+  if (nextPosition.quantity === 0) {
     await client.query("DELETE FROM positions WHERE account_id = $1 AND instrument_id = $2", [accountId, instrumentId]);
   } else {
     await client.query(
       `UPDATE positions
        SET quantity = $3
        WHERE account_id = $1 AND instrument_id = $2`,
-      [accountId, instrumentId, nextQuantity]
+      [accountId, instrumentId, nextPosition.quantity]
     );
   }
+  return nextPosition.realizedPnlPaise;
 }
 
 async function persistOrder(
@@ -435,7 +462,16 @@ export function createV1OrdersRouter(pool: Pool, secret: string): Router {
         }
 
         await updatePosition(client, buyerAccountId, buyer.userId, instrument.id, input.symbol, "buy", fill.quantity, fill.pricePaise);
-        await updatePosition(client, sellerAccountId, seller.userId, instrument.id, input.symbol, "sell", fill.quantity, fill.pricePaise);
+        const realizedPnlPaise = await updatePosition(
+          client,
+          sellerAccountId,
+          seller.userId,
+          instrument.id,
+          input.symbol,
+          "sell",
+          fill.quantity,
+          fill.pricePaise
+        );
 
         const insertedFill = await client.query<{ id: string }>(
           `INSERT INTO fills (order_id, counter_order_id, price, quantity, fee)
@@ -459,7 +495,7 @@ export function createV1OrdersRouter(pool: Pool, secret: string): Router {
         await ledger(client, buyerAccountId, fillId, "trade_debit", -fillNotional, buyerAfterTrade);
         const sellerAfterTrade = safeMoney((ledgerBalances.get(sellerAccountId) ?? BigInt(seller.cash)) + notional, "Ledger balance");
         ledgerBalances.set(sellerAccountId, BigInt(sellerAfterTrade));
-        await ledger(client, sellerAccountId, fillId, "trade_credit", fillNotional, sellerAfterTrade);
+        await ledger(client, sellerAccountId, fillId, "trade_credit", fillNotional, sellerAfterTrade, realizedPnlPaise);
         const buyerAfterFee = safeMoney((ledgerBalances.get(buyerAccountId) ?? BigInt(buyer.cash)) - BigInt(buyerFee), "Ledger balance");
         ledgerBalances.set(buyerAccountId, BigInt(buyerAfterFee));
         await ledger(client, buyerAccountId, fillId, "fee", -buyerFee, buyerAfterFee);

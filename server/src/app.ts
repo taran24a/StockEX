@@ -18,6 +18,7 @@ import { createAdminRouter } from "./routes/admin.js";
 import { createMarketRouter } from "./routes/market.js";
 import { createWatchlistsRouter } from "./routes/watchlists.js";
 import { createV1OrdersRouter } from "./routes/v1-orders.js";
+import { createV1PortfolioRouter } from "./routes/v1-portfolio.js";
 import type { Client as MinioClient } from "minio";
 
 export interface AppDependencies {
@@ -94,6 +95,15 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         "/api/v1/auth/logout": {
           post: { summary: "Log out the bearer-token client", responses: { "204": { description: "Logged out" } } }
         },
+        "/api/v1/portfolio": {
+          get: { summary: "Get virtual cash, holdings, and total equity", responses: { "200": { description: "Portfolio" } } }
+        },
+        "/api/v1/portfolio/performance": {
+          get: { summary: "Get portfolio profit and loss and equity history", responses: { "200": { description: "Portfolio performance" } } }
+        },
+        "/api/v1/ledger": {
+          get: { summary: "Get paginated account ledger entries", responses: { "200": { description: "Ledger entries" } } }
+        },
         "/api/v1/auth/me/avatar": {
           post: { summary: "Upload a profile avatar", responses: { "201": { description: "Avatar uploaded" } } }
         },
@@ -154,6 +164,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
     const authRouter = createAuthRouter(pool, environment, objectStorage);
     app.use("/api/v1/auth", authRouter);
     app.use("/api/v1/orders", createV1OrdersRouter(pool, environment.JWT_SECRET));
+    app.use("/api/v1", createV1PortfolioRouter(pool, environment.JWT_SECRET));
     app.use("/api/auth", authRouter);
     app.use("/api/admin", createAdminRouter(pool, environment.JWT_SECRET));
     app.use("/api/market", createMarketRouter(pool, environment.MOCK_FEED_URL));

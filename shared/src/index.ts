@@ -239,6 +239,42 @@ export const PortfolioSchema = z.object({
   positions: z.array(PortfolioPositionSchema)
 });
 
+export const AccountHoldingSchema = z.object({
+  instrumentId: z.uuid(),
+  symbol: symbolSchema,
+  quantity: quantitySchema,
+  averageCostPaise: paiseSchema,
+  marketPricePaise: positivePaiseSchema,
+  marketValuePaise: paiseSchema,
+  unrealizedPnlPaise: z.number().int().safe()
+});
+
+export const AccountPortfolioResponseSchema = z.object({
+  accountId: z.uuid(),
+  cashBalancePaise: paiseSchema,
+  reservedBalancePaise: paiseSchema,
+  holdings: z.array(AccountHoldingSchema),
+  totalEquityPaise: paiseSchema
+});
+
+export const EquityCurvePointSchema = z.object({
+  timestamp: z.iso.datetime(),
+  equityPaise: paiseSchema
+});
+
+export const HoldingContributionSchema = z.object({
+  symbol: symbolSchema,
+  dayChangeContributionPaise: z.number().int().safe()
+});
+
+export const PortfolioPerformanceResponseSchema = z.object({
+  realizedPnlPaise: z.number().int().safe(),
+  unrealizedPnlPaise: z.number().int().safe(),
+  dayChangePaise: z.number().int().safe(),
+  holdingContributions: z.array(HoldingContributionSchema),
+  equityCurve: z.array(EquityCurvePointSchema)
+});
+
 export const FillSchema = z.object({
   id: z.uuid(),
   orderId: z.uuid(),
@@ -267,6 +303,15 @@ export const LedgerEntrySchema = z.object({
   amountPaise: z.number().int().safe().refine((value) => value !== 0),
   balanceAfterPaise: paiseSchema,
   createdAt: z.iso.datetime()
+});
+
+export const PaginatedLedgerResponseSchema = z.object({
+  entries: z.array(LedgerEntrySchema),
+  pagination: z.object({
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative()
+  })
 });
 
 export const RiskRulesSchema = z.object({
@@ -392,9 +437,15 @@ export type Position = z.infer<typeof PositionSchema>;
 export type PortfolioPosition = z.infer<typeof PortfolioPositionSchema>;
 export type PortfolioResponse = z.infer<typeof PortfolioResponseSchema>;
 export type Portfolio = z.infer<typeof PortfolioSchema>;
+export type AccountHolding = z.infer<typeof AccountHoldingSchema>;
+export type AccountPortfolioResponse = z.infer<typeof AccountPortfolioResponseSchema>;
+export type EquityCurvePoint = z.infer<typeof EquityCurvePointSchema>;
+export type HoldingContribution = z.infer<typeof HoldingContributionSchema>;
+export type PortfolioPerformanceResponse = z.infer<typeof PortfolioPerformanceResponseSchema>;
 export type Fill = z.infer<typeof FillSchema>;
 export type LedgerEntryType = z.infer<typeof LedgerEntryTypeSchema>;
 export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
+export type PaginatedLedgerResponse = z.infer<typeof PaginatedLedgerResponseSchema>;
 export type RiskRules = z.infer<typeof RiskRulesSchema>;
 export type RiskAlert = z.infer<typeof RiskAlertSchema>;
 export type DomainEvent = z.infer<typeof DomainEventSchema>;
