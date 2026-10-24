@@ -11,9 +11,11 @@ import {
   AdminStatsResponseSchema,
   AdminUserSchema,
   AdminUsersResponseSchema,
+  VirtualResetCooldownResponseSchema,
+  VirtualResetCooldownSchema,
   TradeQuerySchema
 } from "@tradewise/shared";
-import type { AdminAuditQuery, AdminInstrumentImportRow, TradeQuery } from "@tradewise/shared";
+import type { AdminAuditQuery, AdminInstrumentImportRow, TradeQuery, VirtualResetCooldown } from "@tradewise/shared";
 import type { Pool } from "pg";
 import { z } from "zod";
 import { withTransaction } from "../db/transaction.js";
@@ -44,6 +46,7 @@ interface AuditEventRow {
 const UserIdParamsSchema = z.object({ id: z.uuid() });
 const csvHeader = "symbol,name,sector,tick_size,last_price";
 const csvContentTypes = new Set(["text/csv", "application/csv", "application/vnd.ms-excel"]);
+const virtualResetCooldownSettingKey = "virtual_account_reset_cooldown_hours";
 
 const csvUpload = multer({
   storage: multer.memoryStorage(),
@@ -145,6 +148,46 @@ async function importInstruments(pool: Pool, buffer: Buffer): Promise<number> {
 export function createAdminRouter(pool: Pool, secret: string): Router {
   const router = Router();
   const requireAdmin = [authenticate(secret), requireRole("admin")];
+
+  router.get("/settings/virtual-account-reset-cooldown", ...requireAdmin, async (_request, response) => {
+    const result = await pool.query<{ value: number | string; updated_at: Date }>(
+      "SELECT value, updated_at FROM system_settings WHERE key = $1",
+      [virtualResetCooldownSettingKey]
+    );
+    const setting = result.rows[0];
+    if (setting === undefined) {
+      throw new Error("Virtual account reset cooldown setting is missing");
+    }
+    response.json(VirtualResetCooldownResponseSchema.parse({
+      cooldownHours: Number(setting.value),
+      updatedAt: setting.updated_at.toISOString()
+    }));
+  });
+
+  router.put(
+    "/settings/virtual-account-reset-cooldown",
+    ...requireAdmin,
+    validateBody(VirtualResetCooldownSchema),
+    async (_request, response) => {
+      const { cooldownHours } = validatedBody<VirtualResetCooldown>(response);
+      const result = await pool.query<{ value: number | string; updated_at: Date }>(
+        `INSERT INTO system_settings (key, value, updated_at)
+         VALUES ($1, to_jsonb($2::integer), now())
+         ON CONFLICT (key) DO UPDATE
+         SET value = EXCLUDED.value, updated_at = now()
+         RETURNING value, updated_at`,
+        [virtualResetCooldownSettingKey, cooldownHours]
+      );
+      const setting = result.rows[0];
+      if (setting === undefined) {
+        throw new Error("Updated virtual account reset cooldown was not returned");
+      }
+      response.json(VirtualResetCooldownResponseSchema.parse({
+        cooldownHours: Number(setting.value),
+        updatedAt: setting.updated_at.toISOString()
+      }));
+    }
+  );
 
   router.post("/instruments/import", ...requireAdmin, csvUpload.single("file"), async (request, response) => {
     const file = request.file;

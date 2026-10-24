@@ -21,6 +21,7 @@ interface AuthContextValue {
   signIn(input: LoginRequest): Promise<void>;
   register(input: RegisterRequest): Promise<void>;
   uploadAvatar(file: File): Promise<void>;
+  updateUser(user: User): void;
   signOut(): void;
 }
 
@@ -156,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn: (input) => establishSession("/api/auth/login", input),
     register: (input) => establishSession("/api/auth/register", input),
     uploadAvatar,
+    updateUser: (updatedUser) => setUser(updatedUser),
     signOut
   }), [token, user, avatarUrl, ready, error]);
 

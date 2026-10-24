@@ -4,7 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "./api";
 import { useAuth } from "./auth";
-import { DashboardOverview, ProfileStub, WorkspaceStub } from "./DashboardOverview";
+import { DashboardOverview, WorkspaceStub } from "./DashboardOverview";
 import { formatPaise } from "./format";
 import { useQuotesSocket } from "./hooks/useQuotesSocket";
 import { Spinner } from "./components/ui";
@@ -14,6 +14,7 @@ const MarketDetailPage = lazy(() => import("./Markets").then((module) => ({ defa
 const OrdersPage = lazy(() => import("./Orders").then((module) => ({ default: module.OrdersPage })));
 const PortfolioPage = lazy(() => import("./Portfolio").then((module) => ({ default: module.PortfolioPage })));
 const RiskPage = lazy(() => import("./Risk").then((module) => ({ default: module.RiskPage })));
+const ProfilePage = lazy(() => import("./Profile").then((module) => ({ default: module.ProfilePage })));
 
 const navigation = [
   { label: "Dashboard", path: "/app/dashboard", mark: "D" },
@@ -368,7 +369,7 @@ export function WorkspaceLayout() {
               <Route element={<OrdersPage />} path="orders" />
               <Route element={<PortfolioPage />} path="portfolio" />
               <Route element={<RiskPage />} path="risk" />
-              <Route element={<ProfileStub />} path="profile" />
+              <Route element={<ProfilePage />} path="profile" />
               <Route element={<WorkspaceStub detail="This workspace route is not implemented yet." title="Page not found" />} path="*" />
             </Routes>
           </Suspense>

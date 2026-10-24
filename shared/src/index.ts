@@ -591,6 +591,10 @@ export const ResetVirtualAccountResponseSchema = z.object({
   nextResetAt: z.iso.datetime()
 });
 
+export const ResetVirtualAccountRequestSchema = z.object({
+  confirm: z.literal(true)
+});
+
 export const VirtualResetCooldownSchema = z.object({
   cooldownHours: z.number().int().positive().max(8760)
 });
@@ -733,6 +737,7 @@ export type ProfileDetailsResponse = z.infer<typeof ProfileDetailsResponseSchema
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
 export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
 export type ResetVirtualAccountResponse = z.infer<typeof ResetVirtualAccountResponseSchema>;
+export type ResetVirtualAccountRequest = z.infer<typeof ResetVirtualAccountRequestSchema>;
 export type VirtualResetCooldown = z.infer<typeof VirtualResetCooldownSchema>;
 export type VirtualResetCooldownResponse = z.infer<typeof VirtualResetCooldownResponseSchema>;
 export type AvatarResponse = z.infer<typeof AvatarResponseSchema>;
