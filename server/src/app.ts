@@ -19,6 +19,7 @@ import { createMarketRouter } from "./routes/market.js";
 import { createWatchlistsRouter } from "./routes/watchlists.js";
 import { createV1OrdersRouter } from "./routes/v1-orders.js";
 import { createV1PortfolioRouter } from "./routes/v1-portfolio.js";
+import { createRiskRouter } from "./routes/risk.js";
 import type { Client as MinioClient } from "minio";
 
 export interface AppDependencies {
@@ -42,7 +43,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         callback(new ForbiddenError("This origin is not allowed", "ORIGIN_NOT_ALLOWED"));
       }
     },
-    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
     credentials: true
   }));
@@ -103,6 +104,16 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         },
         "/api/v1/ledger": {
           get: { summary: "Get paginated account ledger entries", responses: { "200": { description: "Ledger entries" } } }
+        },
+        "/api/v1/risk/rules": {
+          get: { summary: "Get account risk rules", responses: { "200": { description: "Risk rules" } } },
+          put: { summary: "Update account risk rules", responses: { "200": { description: "Risk rules updated" } } }
+        },
+        "/api/v1/risk/summary": {
+          get: { summary: "Get current risk concentrations and warnings", responses: { "200": { description: "Risk summary" } } }
+        },
+        "/api/v1/risk/alerts": {
+          get: { summary: "Get paginated risk alerts", responses: { "200": { description: "Risk alerts" } } }
         },
         "/api/v1/auth/me/avatar": {
           post: { summary: "Upload a profile avatar", responses: { "201": { description: "Avatar uploaded" } } }
@@ -165,6 +176,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
     app.use("/api/v1/auth", authRouter);
     app.use("/api/v1/orders", createV1OrdersRouter(pool, environment.JWT_SECRET));
     app.use("/api/v1", createV1PortfolioRouter(pool, environment.JWT_SECRET));
+    app.use("/api/v1/risk", createRiskRouter(pool, environment.JWT_SECRET));
     app.use("/api/auth", authRouter);
     app.use("/api/admin", createAdminRouter(pool, environment.JWT_SECRET));
     app.use("/api/market", createMarketRouter(pool, environment.MOCK_FEED_URL));

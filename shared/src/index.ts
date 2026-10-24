@@ -314,12 +314,33 @@ export const PaginatedLedgerResponseSchema = z.object({
   })
 });
 
-export const RiskRulesSchema = z.object({
-  accountId: z.uuid(),
+export const RiskRulesInputSchema = z.object({
   maxOrderNotionalPaise: positivePaiseSchema,
-  maxConcentrationPct: z.number().positive().max(100).multipleOf(0.01),
+  maxSingleStockConcentrationPct: z.number().positive().max(100).multipleOf(0.01),
+  maxSectorConcentrationPct: z.number().positive().max(100).multipleOf(0.01)
+});
+
+export const RiskRulesSchema = RiskRulesInputSchema.extend({
+  accountId: z.uuid(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime()
+});
+
+export const RiskConcentrationSchema = z.object({
+  name: z.string().trim().min(1),
+  marketValuePaise: paiseSchema,
+  concentrationPct: z.number().nonnegative().max(100)
+});
+
+export const RiskSummarySchema = z.object({
+  accountId: z.uuid(),
+  totalEquityPaise: paiseSchema,
+  singleStocks: z.array(RiskConcentrationSchema.extend({
+    name: symbolSchema,
+    sector: z.string().trim().min(1)
+  })),
+  sectors: z.array(RiskConcentrationSchema),
+  warnings: z.array(z.string())
 });
 
 export const RiskAlertSchema = z.object({
@@ -333,6 +354,15 @@ export const RiskAlertSchema = z.object({
   details: z.record(z.string(), z.unknown()),
   acknowledgedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime()
+});
+
+export const RiskAlertsResponseSchema = z.object({
+  alerts: z.array(RiskAlertSchema),
+  pagination: z.object({
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative()
+  })
 });
 
 export const DomainEventSchema = z.object({
@@ -447,7 +477,10 @@ export type LedgerEntryType = z.infer<typeof LedgerEntryTypeSchema>;
 export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
 export type PaginatedLedgerResponse = z.infer<typeof PaginatedLedgerResponseSchema>;
 export type RiskRules = z.infer<typeof RiskRulesSchema>;
+export type RiskRulesInput = z.infer<typeof RiskRulesInputSchema>;
+export type RiskSummary = z.infer<typeof RiskSummarySchema>;
 export type RiskAlert = z.infer<typeof RiskAlertSchema>;
+export type RiskAlertsResponse = z.infer<typeof RiskAlertsResponseSchema>;
 export type DomainEvent = z.infer<typeof DomainEventSchema>;
 export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
 export type AvatarResponse = z.infer<typeof AvatarResponseSchema>;

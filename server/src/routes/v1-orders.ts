@@ -22,6 +22,14 @@ import {
   calculatePositionAfterBuy,
   calculatePositionAfterSell
 } from "../services/portfolio-calculations.js";
+import {
+  DEFAULT_PRE_TRADE_RISK_RULES,
+  evaluatePreTradeRisk
+} from "../services/pre-trade-risk.js";
+import type {
+  ExistingRiskHolding,
+  PreTradeRiskRules
+} from "../services/pre-trade-risk.js";
 
 const IdParamsSchema = z.object({ id: z.uuid() });
 const IdempotencyKeySchema = z.string().trim().min(1).max(128);
@@ -36,7 +44,21 @@ interface AccountRow {
 interface InstrumentRow {
   id: string;
   symbol: string;
+  sector: string;
   last_price: string | number;
+}
+
+interface RiskRuleRow {
+  id: string;
+  max_order_notional: string | number;
+  max_concentration_pct: string | number;
+  max_sector_concentration_pct: string | number;
+}
+
+interface RiskHoldingRow {
+  symbol: string;
+  sector: string;
+  market_value: string | number;
 }
 
 interface RestingOrderRow {
@@ -262,7 +284,11 @@ async function persistOrder(
   state.pendingEvents.push(accepted);
 }
 
-export function createV1OrdersRouter(pool: Pool, secret: string): Router {
+export function createV1OrdersRouter(
+  pool: Pool,
+  secret: string,
+  riskEvaluator = evaluatePreTradeRisk
+): Router {
   const router = Router();
   const requireAuth = authenticate(secret);
 
@@ -307,7 +333,7 @@ export function createV1OrdersRouter(pool: Pool, secret: string): Router {
       }
 
       const instrumentResult = await client.query<InstrumentRow>(
-        "SELECT id, symbol, last_price FROM instruments WHERE symbol = $1",
+        "SELECT id, symbol, sector, last_price FROM instruments WHERE symbol = $1",
         [input.symbol]
       );
       const instrument = instrumentResult.rows[0];
@@ -315,6 +341,130 @@ export function createV1OrdersRouter(pool: Pool, secret: string): Router {
         throw new NotFoundError("Instrument was not found");
       }
       const referencePrice = databaseInteger(instrument.last_price, "instrument price");
+      const riskRuleResult = await client.query<RiskRuleRow>(
+        `INSERT INTO risk_rules
+           (account_id, max_order_notional, max_concentration_pct, max_sector_concentration_pct)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (account_id) DO UPDATE SET account_id = EXCLUDED.account_id
+         RETURNING id, max_order_notional, max_concentration_pct, max_sector_concentration_pct`,
+        [
+          accountId,
+          DEFAULT_PRE_TRADE_RISK_RULES.maxOrderNotionalPaise,
+          DEFAULT_PRE_TRADE_RISK_RULES.maxSingleStockConcentrationPct,
+          DEFAULT_PRE_TRADE_RISK_RULES.maxSectorConcentrationPct
+        ]
+      );
+      const riskRule = riskRuleResult.rows[0];
+      if (riskRule === undefined) {
+        throw new Error("Risk rules could not be loaded for pre-trade evaluation");
+      }
+      const rules: PreTradeRiskRules = {
+        maxOrderNotionalPaise: databaseInteger(riskRule.max_order_notional, "maximum order notional"),
+        maxSingleStockConcentrationPct: Number(riskRule.max_concentration_pct),
+        maxSectorConcentrationPct: Number(riskRule.max_sector_concentration_pct)
+      };
+      const riskHoldingResult = await client.query<RiskHoldingRow>(
+        `SELECT instrument.symbol, instrument.sector,
+                SUM(position.quantity * instrument.last_price) AS market_value
+         FROM positions AS position
+         JOIN instruments AS instrument ON instrument.id = position.instrument_id
+         WHERE position.account_id = $1
+         GROUP BY instrument.symbol, instrument.sector`,
+        [accountId]
+      );
+      const riskHoldings: ExistingRiskHolding[] = riskHoldingResult.rows.map((row) => ({
+        symbol: row.symbol,
+        sector: row.sector,
+        marketValuePaise: databaseInteger(row.market_value, "holding market value")
+      }));
+      const totalEquityPaise = safeMoney(
+        BigInt(databaseInteger(account.cash_balance, "cash balance")) +
+          riskHoldings.reduce((total, holding) => total + BigInt(holding.marketValuePaise), 0n),
+        "Portfolio equity"
+      );
+      const riskPricePaise = input.type === "limit" ? input.limitPricePaise : referencePrice;
+      const orderNotionalPaise = safeMoney(
+        BigInt(input.quantity) * BigInt(riskPricePaise),
+        "Order notional"
+      );
+      const riskRejection = riskEvaluator({
+        symbol: input.symbol,
+        sector: instrument.sector,
+        side: input.side,
+        orderNotionalPaise,
+        totalEquityPaise,
+        holdings: riskHoldings
+      }, rules);
+      if (riskRejection !== null) {
+        const orderId = randomUUID();
+        const createdAt = new Date();
+        const orderPrice = input.type === "limit" ? input.limitPricePaise : referencePrice;
+        await client.query(
+          `INSERT INTO orders
+             (id, user_id, symbol, side, quantity, price_paise, total_paise, status,
+              account_id, instrument_id, type, limit_price, filled_quantity, idempotency_key,
+              reserved_amount, cancel_reason, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'rejected', $8, $9, $10, $11, 0, $12, 0, $13, $14)`,
+          [
+            orderId,
+            account.user_id,
+            input.symbol,
+            input.side,
+            input.quantity,
+            orderPrice,
+            orderNotionalPaise,
+            accountId,
+            instrument.id,
+            input.type,
+            input.type === "limit" ? input.limitPricePaise : null,
+            key,
+            riskRejection.message,
+            createdAt
+          ]
+        );
+        const event = await recordEvent(client, orderId, "RISK_REJECTED", {
+          orderId,
+          rule: riskRejection.rule,
+          reason: riskRejection.message,
+          ...(riskRejection.currentPct === undefined ? {} : { currentPct: riskRejection.currentPct }),
+          ...(riskRejection.projectedPct === undefined ? {} : { projectedPct: riskRejection.projectedPct })
+        }, requestId);
+        await client.query(
+          `INSERT INTO risk_alerts
+             (account_id, rule_id, order_id, alert_type, severity, message, details)
+           VALUES ($1, $2, $3, $4, 'warning', $5, $6::jsonb)`,
+          [
+            accountId,
+            riskRule.id,
+            orderId,
+            riskRejection.rule,
+            riskRejection.message,
+            JSON.stringify({
+              rule: riskRejection.rule,
+              ...(riskRejection.currentPct === undefined ? {} : { currentPct: riskRejection.currentPct }),
+              ...(riskRejection.projectedPct === undefined ? {} : { projectedPct: riskRejection.projectedPct })
+            })
+          ]
+        );
+        const rejectionResponse = {
+          error: {
+            code: "RISK_REJECTED",
+            message: riskRejection.message
+          }
+        };
+        await client.query(
+          `INSERT INTO idempotency_records (account_id, key, request_hash, response, status_code)
+           VALUES ($1, $2, $3, $4::jsonb, 422)`,
+          [accountId, key, requestHash, JSON.stringify(rejectionResponse)]
+        );
+        return {
+          response: rejectionResponse,
+          statusCode: 422,
+          events: [event],
+          fills: [],
+          replay: false
+        };
+      }
 
       const restingResult = await client.query<RestingOrderRow>(
         `SELECT id, account_id, user_id, symbol, side, type, quantity, filled_quantity,
