@@ -1,0 +1,26 @@
+{
+  "name": "tradewise",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "pretypecheck": "npm run build --workspace @tradewise/shared",
+    "pretest": "npm run build --workspace @tradewise/shared",
+    "dev:server": "npm run build --workspace @tradewise/shared && npm run dev --workspace @tradewise/server",
+    "dev:feed": "npm run build --workspace @tradewise/shared && npm run dev:feed --workspace @tradewise/server",
+    "dev:client": "npm run build --workspace @tradewise/shared && npm run dev --workspace @tradewise/client",
+    "migrate": "npm run build --workspace @tradewise/shared && npm run migrate --workspace @tradewise/server"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
