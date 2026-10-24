@@ -22,7 +22,12 @@ export function Input({ label, error, hint, id, className = "", ...props }: Inpu
         {...props}
       />
       {(error !== undefined || hint !== undefined) && (
-        <p className={`text-xs ${error === undefined ? "text-slate-500" : "text-rose-400"}`} id={messageId}>
+        <p
+          aria-live={error === undefined ? undefined : "assertive"}
+          className={`text-xs ${error === undefined ? "text-slate-500" : "text-rose-400"}`}
+          id={messageId}
+          role={error === undefined ? undefined : "alert"}
+        >
           {error ?? hint}
         </p>
       )}

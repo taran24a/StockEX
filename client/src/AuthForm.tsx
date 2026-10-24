@@ -14,6 +14,32 @@ interface AuthFormProps {
   showModeToggle?: boolean;
 }
 
+type FieldErrors = Partial<Record<"email" | "displayName" | "password", string>>;
+
+function getFieldErrors(issues: Array<{ path: PropertyKey[]; message: string }>): FieldErrors {
+  const errors: FieldErrors = {};
+  for (const issue of issues) {
+    const field = issue.path[0];
+    if ((field === "email" || field === "displayName" || field === "password") && errors[field] === undefined) {
+      errors[field] = issue.message;
+    }
+  }
+  return errors;
+}
+
+function passwordStrength(password: string): { label: string; value: number; width: string } {
+  if (password.length === 0) {
+    return { label: "Start typing", value: 0, width: "0%" };
+  }
+  if (Array.from(password).length < 12) {
+    return { label: "Weak", value: 1, width: "33.33%" };
+  }
+  if (Array.from(password).length < 16) {
+    return { label: "Fair", value: 2, width: "66.66%" };
+  }
+  return { label: "Strong", value: 3, width: "100%" };
+}
+
 export function AuthForm({
   onLogin,
   onRegister,
@@ -25,26 +51,34 @@ export function AuthForm({
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
-    setSubmitting(true);
+    setFieldErrors({});
+    if (submitting) {
+      return;
+    }
+
     try {
       if (mode === "login") {
         const parsed = LoginRequestSchema.safeParse({ email, password });
         if (!parsed.success) {
-          setError(parsed.error.issues[0]?.message ?? "Please check your details");
+          setFieldErrors(getFieldErrors(parsed.error.issues));
           return;
         }
+        setSubmitting(true);
         await onLogin(parsed.data);
       } else {
         const parsed = RegisterRequestSchema.safeParse({ email, displayName, password });
         if (!parsed.success) {
-          setError(parsed.error.issues[0]?.message ?? "Please check your details");
+          setFieldErrors(getFieldErrors(parsed.error.issues));
           return;
         }
+        setSubmitting(true);
         await onRegister(parsed.data);
       }
     } catch (requestError) {
@@ -57,38 +91,120 @@ export function AuthForm({
   function toggleMode(): void {
     setMode((current) => current === "login" ? "register" : "login");
     setError(null);
+    setFieldErrors({});
   }
 
+  function fillDemoAccount(): void {
+    setEmail("demo@tradewise.dev");
+    setPassword("Demo@1234");
+    setFieldErrors({});
+    setError(null);
+  }
+
+  const strength = passwordStrength(password);
+
   return (
-    <form className="space-y-4" onSubmit={submit}>
+    <form className="auth-form" noValidate onSubmit={submit}>
+      <header className="auth-form-heading">
+        <p className="auth-eyebrow">{mode === "login" ? "Welcome back" : "Your practice account"}</p>
+        <h2>{mode === "login" ? "Sign in to TradeWise" : "Create your account"}</h2>
+        <p>{mode === "login"
+          ? "Pick up where your learning left off."
+          : "Start building your market confidence in a safe space."}</p>
+      </header>
       {mode === "register" && (
         <Input
           autoComplete="name"
+          error={fieldErrors.displayName}
+          id="auth-display-name"
           label="Display name"
-          onChange={(event) => setDisplayName(event.target.value)}
+          name="displayName"
+          onChange={(event) => {
+            setDisplayName(event.target.value);
+            setFieldErrors((current) => ({ ...current, displayName: undefined }));
+          }}
+          required
           value={displayName}
         />
       )}
       <Input
         autoComplete="email"
+        error={fieldErrors.email}
+        id="auth-email"
         label="Email"
-        onChange={(event) => setEmail(event.target.value)}
+        name="email"
+        onChange={(event) => {
+          setEmail(event.target.value);
+          setFieldErrors((current) => ({ ...current, email: undefined }));
+        }}
+        required
         type="email"
         value={email}
       />
-      <Input
-        autoComplete={mode === "login" ? "current-password" : "new-password"}
-        label="Password"
-        onChange={(event) => setPassword(event.target.value)}
-        type="password"
-        value={password}
-      />
+      <div className="auth-password-field">
+        <Input
+          autoComplete={mode === "login" ? "current-password" : "new-password"}
+          error={fieldErrors.password}
+          id="auth-password"
+          label="Password"
+          name="password"
+          onChange={(event) => {
+            setPassword(event.target.value);
+            setFieldErrors((current) => ({ ...current, password: undefined }));
+          }}
+          required
+          type={passwordVisible ? "text" : "password"}
+          value={password}
+        />
+        <Button
+          aria-label={passwordVisible ? "Hide password" : "Show password"}
+          aria-pressed={passwordVisible}
+          className="auth-password-toggle"
+          onClick={() => setPasswordVisible((visible) => !visible)}
+          type="button"
+          variant="ghost"
+        >
+          {passwordVisible ? "Hide" : "Show"}
+        </Button>
+      </div>
       {mode === "register" && (
-        <p className="text-xs text-slate-500">Use at least 12 characters for your password.</p>
+        <div className="auth-strength" aria-live="polite">
+          <div className="auth-strength-copy">
+            <span>Password strength</span>
+            <span className={`auth-strength-label auth-strength-${strength.value}`}>{strength.label}</span>
+          </div>
+          <div
+            aria-label="Password strength"
+            aria-valuemax={3}
+            aria-valuemin={0}
+            aria-valuenow={strength.value}
+            className="auth-strength-track"
+            role="progressbar"
+          >
+            <span
+              className={`auth-strength-fill auth-strength-fill-${strength.value}`}
+              style={{ width: strength.width }}
+            />
+          </div>
+          <p className="auth-form-hint">
+            Use at least 12 characters. Passwords are limited to 72 UTF-8 bytes.
+          </p>
+        </div>
       )}
-      {error !== null && <p className="text-sm text-rose-400" role="alert">{error}</p>}
+      {error !== null && <p className="auth-form-error" role="alert">{error}</p>}
+      {mode === "login" && (
+        <Button
+          className="auth-demo-button"
+          onClick={fillDemoAccount}
+          type="button"
+          variant="secondary"
+        >
+          Try demo account
+        </Button>
+      )}
+      {submitting && <p className="auth-submitting" role="status">Securely checking your details…</p>}
       <Button
-        className="w-full"
+        className="auth-submit"
         disabled={submitting}
         type="submit"
       >

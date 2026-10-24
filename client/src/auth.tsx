@@ -26,8 +26,24 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function readSessionToken(): string | null {
+  try {
+    return window.sessionStorage.getItem(SESSION_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function removeSessionToken(): void {
+  try {
+    window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    // In-memory authentication remains available when browser storage is disabled.
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => sessionStorage.getItem(SESSION_TOKEN_KEY));
+  const [token, setToken] = useState<string | null>(readSessionToken);
   const [user, setUser] = useState<User | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -35,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     function handleSessionExpired(): void {
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      removeSessionToken();
       setToken(null);
       setUser(null);
       setAvatarUrl(null);
@@ -61,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (active) {
           setUser(profile.user);
           setAvatarUrl(profile.avatarUrl);
-          setError(null);
+          setError((current) => current?.startsWith("Your session is active, but it could not be saved") ? current : null);
         }
       })
       .catch((requestError: unknown) => {
@@ -69,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         if (requestError instanceof ApiClientError && requestError.status === 401) {
-          sessionStorage.removeItem(SESSION_TOKEN_KEY);
+          removeSessionToken();
           setToken(null);
           setUser(null);
           setAvatarUrl(null);
@@ -96,16 +112,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "POST",
       body: JSON.stringify(request)
     });
-    sessionStorage.setItem(SESSION_TOKEN_KEY, session.token);
+    let storageWarning: string | null = null;
+    try {
+      window.sessionStorage.setItem(SESSION_TOKEN_KEY, session.token);
+    } catch {
+      storageWarning = "Your session is active, but it could not be saved in this browser. It will end when this tab is closed or reloaded.";
+    }
     setToken(session.token);
     setUser(session.user);
     setAvatarUrl(null);
-    setError(null);
+    setError(storageWarning);
     setReady(true);
   }
 
   function signOut(): void {
-    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    removeSessionToken();
     setToken(null);
     setUser(null);
     setAvatarUrl(null);

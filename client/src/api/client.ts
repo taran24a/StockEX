@@ -25,10 +25,19 @@ export class ApiClientError extends Error {
 }
 
 function currentToken(): string | null {
-  if (typeof sessionStorage === "undefined") {
+  try {
+    return sessionStorage.getItem(SESSION_TOKEN_KEY);
+  } catch {
     return null;
   }
-  return sessionStorage.getItem(SESSION_TOKEN_KEY);
+}
+
+function clearCurrentToken(): void {
+  try {
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    // AuthProvider also clears its in-memory token when it receives the event.
+  }
 }
 
 function normalizeApiError(payload: unknown, status: number): ApiClientError {
@@ -79,7 +88,7 @@ export async function apiRequest<Schema extends z.ZodType>(
 
   if (response.status === 401) {
     if (accessToken !== null && typeof window !== "undefined") {
-      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      clearCurrentToken();
       window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
     }
     throw new ApiClientError("Your session has expired. Please sign in again.", 401, "UNAUTHORIZED");
