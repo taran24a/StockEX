@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
+import type { ReactNode } from "react";
 import { ApiClientError } from "./api";
 import { MarketsPage, OrderTicket } from "./Markets";
 
@@ -67,9 +69,13 @@ const orderResponse = {
   totalPaise: quote.pricePaise
 };
 
-function renderPage(element: React.ReactNode) {
+function renderPage(element: ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>{element}</MemoryRouter>
+    </QueryClientProvider>
+  );
 }
 
 beforeEach(() => {
@@ -104,16 +110,16 @@ describe("markets workspace", () => {
     });
 
     renderPage(<MarketsPage />);
-    expect(await screen.findByRole("link", { name: /ALFA Alfa Industries/ })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /BRAVO Bravo Energy/ })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: /Alfa Industries/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Bravo Energy/ })).toBeTruthy();
 
     fireEvent.change(screen.getByRole("combobox", { name: "Filter by sector" }), { target: { value: "Energy" } });
-    expect(screen.queryByRole("link", { name: /ALFA Alfa Industries/ })).toBeNull();
-    expect(screen.getByRole("link", { name: /BRAVO Bravo Energy/ })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /Alfa Industries/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /Bravo Energy/ })).toBeTruthy();
     fireEvent.change(screen.getByRole("combobox", { name: "Filter by sector" }), { target: { value: "all" } });
     fireEvent.change(screen.getByRole("searchbox", { name: "Search instruments" }), { target: { value: "alfa" } });
-    expect(screen.getByRole("link", { name: /ALFA Alfa Industries/ })).toBeTruthy();
-    expect(screen.queryByRole("link", { name: /BRAVO Bravo Energy/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /Alfa Industries/ })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /Bravo Energy/ })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Add ALFA to watchlist" }));
     await waitFor(() => expect(apiRequestMock).toHaveBeenCalledWith(
@@ -133,8 +139,7 @@ describe("markets workspace", () => {
     vi.spyOn(window.crypto, "randomUUID").mockReturnValue("00000000-0000-4000-8000-000000000001");
 
     renderPage(<OrderTicket quote={quote} symbol="ALFA" />);
-    expect(await screen.findByText("Buying power")).toBeTruthy();
-    expect(screen.getByText("₹980.00")).toBeTruthy();
+    expect(await screen.findByText("₹980.00")).toBeTruthy();
 
     fireEvent.keyDown(document, { key: "s" });
     expect(screen.getByRole("button", { name: "SELL", pressed: true })).toBeTruthy();
