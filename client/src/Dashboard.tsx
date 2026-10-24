@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ChangeEvent } from "react";
 import { ApiClientError, apiRequest } from "./api";
 import { useAuth } from "./auth";
+import { AdminUsersPanel } from "./AdminUsersPanel";
 import { LivePriceChart, type PricePoint } from "./LivePriceChart";
 import { formatPaise } from "./format";
 
@@ -307,6 +308,8 @@ export function Dashboard() {
             <p className="mt-2 text-3xl font-semibold text-white">{portfolioQuery.data?.positions.length ?? "—"}</p>
           </article>
         </section>
+
+        <AdminUsersPanel role={user?.role ?? "user"} token={token} />
 
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-6">
