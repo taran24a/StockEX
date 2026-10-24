@@ -109,8 +109,10 @@ export const AvatarFileMetadataSchema = z.object({
   size: z.number().int().positive().max(2 * 1024 * 1024)
 });
 
+// SYLLABUS: validation
 export const TradeQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(50)
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).max(1_000_000).default(0)
 });
 
 export const TradeSchema = z.object({

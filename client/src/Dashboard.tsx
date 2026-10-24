@@ -16,8 +16,43 @@ import { AdminUsersPanel } from "./AdminUsersPanel";
 import { LivePriceChart, type PricePoint } from "./LivePriceChart";
 import { formatPaise } from "./format";
 
+const HISTORY_PAGE_SIZE = 20;
+const HISTORY_LOOKAHEAD = HISTORY_PAGE_SIZE + 1;
+
 function formatDate(value: string): string {
   return new Date(value).toLocaleString();
+}
+
+// SYLLABUS: reusable components
+// SYLLABUS: Tailwind
+function HistoryPagination({
+  label,
+  page,
+  hasNextPage,
+  onPageChange
+}: {
+  label: string;
+  page: number;
+  hasNextPage: boolean;
+  onPageChange(page: number): void;
+}) {
+  return (
+    <nav aria-label={`${label} pagination`} className="mt-4 flex items-center justify-between text-sm">
+      <button
+        className="rounded border border-slate-700 px-3 py-1.5 text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={page === 0}
+        onClick={() => onPageChange(page - 1)}
+        type="button"
+      >Previous</button>
+      <span className="text-slate-500">Page {page + 1}</span>
+      <button
+        className="rounded border border-slate-700 px-3 py-1.5 text-slate-300 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+        disabled={!hasNextPage}
+        onClick={() => onPageChange(page + 1)}
+        type="button"
+      >Next</button>
+    </nav>
+  );
 }
 
 function QueryError({ message }: { message: string }) {
@@ -65,7 +100,15 @@ function QuoteTable({
   );
 }
 
-function OrderForm({ token, quote }: { token: string; quote: Instrument | undefined }) {
+function OrderForm({
+  token,
+  quote,
+  onOrderPlaced
+}: {
+  token: string;
+  quote: Instrument | undefined;
+  onOrderPlaced(): void;
+}) {
   const queryClient = useQueryClient();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState("1");
@@ -82,6 +125,7 @@ function OrderForm({ token, quote }: { token: string; quote: Instrument | undefi
       });
     },
     onSuccess: async () => {
+      onOrderPlaced();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["wallet"] }),
         queryClient.invalidateQueries({ queryKey: ["portfolio"] }),
@@ -155,6 +199,8 @@ export function Dashboard() {
   const [chartData, setChartData] = useState<PricePoint[]>([]);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [ordersPage, setOrdersPage] = useState(0);
+  const [tradesPage, setTradesPage] = useState(0);
   const quotesQuery = useQuery({
     queryKey: ["quotes"],
     queryFn: () => apiRequest("/api/quotes", QuotesResponseSchema),
@@ -172,13 +218,21 @@ export function Dashboard() {
     refetchInterval: 5_000
   });
   const ordersQuery = useQuery({
-    queryKey: ["orders"],
-    queryFn: () => apiRequest("/api/orders?limit=20", OrdersResponseSchema, token ?? undefined),
+    queryKey: ["orders", ordersPage],
+    queryFn: () => apiRequest(
+      `/api/orders?limit=${HISTORY_LOOKAHEAD}&offset=${ordersPage * HISTORY_PAGE_SIZE}`,
+      OrdersResponseSchema,
+      token ?? undefined
+    ),
     enabled: token !== null
   });
   const tradesQuery = useQuery({
-    queryKey: ["trades"],
-    queryFn: () => apiRequest("/api/trades?limit=20", TradesResponseSchema, token ?? undefined),
+    queryKey: ["trades", tradesPage],
+    queryFn: () => apiRequest(
+      `/api/trades?limit=${HISTORY_LOOKAHEAD}&offset=${tradesPage * HISTORY_PAGE_SIZE}`,
+      TradesResponseSchema,
+      token ?? undefined
+    ),
     enabled: token !== null
   });
   const quotes = quotesQuery.data?.quotes ?? [];
@@ -359,14 +413,24 @@ export function Dashboard() {
           <aside className="space-y-6">
             <article className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
               <h2 className="mb-4 font-semibold text-white">Place market order</h2>
-              {token !== null && <OrderForm key={selectedQuote?.symbol} token={token} quote={selectedQuote} />}
+              {token !== null && (
+                <OrderForm
+                  key={selectedQuote?.symbol}
+                  onOrderPlaced={() => {
+                    setOrdersPage(0);
+                    setTradesPage(0);
+                  }}
+                  quote={selectedQuote}
+                  token={token}
+                />
+              )}
             </article>
             <article className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
               <h2 className="mb-3 font-semibold text-white">Recent orders</h2>
               {ordersQuery.isPending ? <p className="text-sm text-slate-500">Loading orders…</p> :
-                ordersQuery.data?.orders.length === 0 ? <p className="text-sm text-slate-500">No orders yet.</p> : (
+                ordersQuery.data?.orders.length === 0 ? <p className="text-sm text-slate-500">No orders on this page.</p> : (
                   <ul className="space-y-3">
-                    {ordersQuery.data?.orders.slice(0, 5).map((order) => (
+                    {ordersQuery.data?.orders.slice(0, HISTORY_PAGE_SIZE).map((order) => (
                       <li className="flex items-center justify-between border-b border-slate-800 pb-3 text-sm" key={order.id}>
                         <span><strong className={order.side === "buy" ? "text-emerald-400" : "text-rose-400"}>{order.side.toUpperCase()}</strong> {order.quantity} {order.symbol}</span>
                         <span className="text-slate-400">{formatPaise(order.totalPaise)}</span>
@@ -374,13 +438,21 @@ export function Dashboard() {
                     ))}
                   </ul>
                 )}
+              {!ordersQuery.isPending && ordersQuery.error === null && (
+                <HistoryPagination
+                  hasNextPage={(ordersQuery.data?.orders.length ?? 0) > HISTORY_PAGE_SIZE}
+                  label="Orders"
+                  onPageChange={setOrdersPage}
+                  page={ordersPage}
+                />
+              )}
             </article>
             <article className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
               <h2 className="mb-3 font-semibold text-white">Trade history</h2>
               {tradesQuery.isPending ? <p className="text-sm text-slate-500">Loading trades…</p> :
-                tradesQuery.data?.trades.length === 0 ? <p className="text-sm text-slate-500">No trades yet.</p> : (
+                tradesQuery.data?.trades.length === 0 ? <p className="text-sm text-slate-500">No trades on this page.</p> : (
                   <ul className="space-y-3">
-                    {tradesQuery.data?.trades.slice(0, 5).map((trade) => (
+                    {tradesQuery.data?.trades.slice(0, HISTORY_PAGE_SIZE).map((trade) => (
                       <li className="border-b border-slate-800 pb-3 text-sm" key={trade.id}>
                         <div className="flex justify-between">
                           <span><strong className={trade.side === "buy" ? "text-emerald-400" : "text-rose-400"}>{trade.side.toUpperCase()}</strong> {trade.quantity} {trade.symbol}</span>
@@ -391,6 +463,14 @@ export function Dashboard() {
                     ))}
                   </ul>
                 )}
+              {!tradesQuery.isPending && tradesQuery.error === null && (
+                <HistoryPagination
+                  hasNextPage={(tradesQuery.data?.trades.length ?? 0) > HISTORY_PAGE_SIZE}
+                  label="Trades"
+                  onPageChange={setTradesPage}
+                  page={tradesPage}
+                />
+              )}
             </article>
           </aside>
         </section>

@@ -133,14 +133,15 @@ export function createOrdersRouter(pool: Pool, secret: string, feedUrl: string):
   });
 
   router.get("/orders", requireAuth, async (request, response) => {
-    const { limit } = validateQuery(TradeQuerySchema, request);
+    // SYLLABUS: route/query params
+    const { limit, offset } = validateQuery(TradeQuerySchema, request);
     const result = await pool.query<OrderRow>(
       `SELECT id, symbol, side, quantity, price_paise, total_paise, created_at
        FROM orders
        WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT $2`,
-      [request.auth?.id, limit]
+       ORDER BY created_at DESC, id DESC
+       LIMIT $2 OFFSET $3`,
+      [request.auth?.id, limit, offset]
     );
     const orders = result.rows.map((row) => OrderSchema.parse({
       id: row.id,

@@ -96,14 +96,14 @@ export function createPortfolioRouter(pool: Pool, secret: string, feedUrl: strin
 
   router.get("/trades", requireAuth, async (request, response) => {
     // SYLLABUS: route/query params
-    const { limit } = validateQuery(TradeQuerySchema, request);
+    const { limit, offset } = validateQuery(TradeQuerySchema, request);
     const result = await pool.query<TradeRow>(
       `SELECT id, symbol, side, quantity, price_paise, total_paise, created_at
        FROM trades
        WHERE user_id = $1
-       ORDER BY created_at DESC
-       LIMIT $2`,
-      [request.auth?.id, limit]
+       ORDER BY created_at DESC, id DESC
+       LIMIT $2 OFFSET $3`,
+      [request.auth?.id, limit, offset]
     );
     const trades = result.rows.map((row) => TradeSchema.parse({
       id: row.id,
