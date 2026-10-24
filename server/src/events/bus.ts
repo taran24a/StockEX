@@ -3,6 +3,26 @@ import type { Quote } from "@tradewise/shared";
 
 type EventPayloads = {
   quote: [quote: Quote];
+  order: [event: {
+    id: string;
+    aggregateId: string;
+    eventType: string;
+    payload: Record<string, unknown>;
+  }];
+  fill: [fill: {
+    fill: {
+      symbol: string;
+      makerOrderId: string;
+      takerOrderId: string;
+      pricePaise: number;
+      quantity: number;
+    };
+    fillId: string;
+    makerAccountId: string;
+    takerAccountId: string;
+    makerFeePaise: number;
+    takerFeePaise: number;
+  }];
 };
 
 class TypedEventBus extends EventEmitter {

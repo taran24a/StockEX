@@ -17,6 +17,7 @@ import { createQuotesRouter } from "./routes/quotes.js";
 import { createAdminRouter } from "./routes/admin.js";
 import { createMarketRouter } from "./routes/market.js";
 import { createWatchlistsRouter } from "./routes/watchlists.js";
+import { createV1OrdersRouter } from "./routes/v1-orders.js";
 import type { Client as MinioClient } from "minio";
 
 export interface AppDependencies {
@@ -152,6 +153,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
     );
     const authRouter = createAuthRouter(pool, environment, objectStorage);
     app.use("/api/v1/auth", authRouter);
+    app.use("/api/v1/orders", createV1OrdersRouter(pool, environment.JWT_SECRET));
     app.use("/api/auth", authRouter);
     app.use("/api/admin", createAdminRouter(pool, environment.JWT_SECRET));
     app.use("/api/market", createMarketRouter(pool, environment.MOCK_FEED_URL));

@@ -5,6 +5,7 @@ import { createDatabasePool } from "./db/pool.js";
 import { logger } from "./logger.js";
 import { attachQuoteStream } from "./market/quote-stream.js";
 import { startPriceTicker } from "./services/price-ticker.js";
+import { startMarketMaker } from "./services/market-maker.js";
 import { createObjectStorage, ensureUploadBucket } from "./storage.js";
 
 const environment = loadEnvironment();
@@ -15,10 +16,12 @@ const app = createApp({ pool, environment, objectStorage });
 const server = createServer(app);
 const closeQuoteStream = attachQuoteStream(server, environment.MOCK_FEED_URL);
 let stopPriceTicker = (): void => undefined;
+let stopMarketMaker = (): void => undefined;
 
 try {
   await ensureUploadBucket(objectStorage, environment.MINIO_BUCKET);
   stopPriceTicker = startPriceTicker(pool, environment.MOCK_FEED_URL);
+  stopMarketMaker = startMarketMaker(pool);
   server.listen(environment.PORT, () => {
     logger.info({ port: environment.PORT }, "TradeWise API listening");
   });
@@ -39,6 +42,7 @@ function shutdown(signal: NodeJS.Signals): void {
   logger.info({ signal }, "TradeWise API shutting down");
   closeQuoteStream();
   stopPriceTicker();
+  stopMarketMaker();
   server.close((error) => {
     if (error !== undefined) {
       logger.error({ err: error }, "HTTP server shutdown failed");

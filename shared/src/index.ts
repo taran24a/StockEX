@@ -323,6 +323,21 @@ export const TradeQuerySchema = z.object({
 
 export const PaginationQuerySchema = TradeQuerySchema;
 
+export const OrdersQuerySchema = TradeQuerySchema.extend({
+  symbol: symbolSchema.optional(),
+  side: OrderSideSchema.optional(),
+  status: OrderStatusSchema.optional()
+});
+
+export const PaginatedOrdersResponseSchema = z.object({
+  orders: z.array(OrderResponseSchema),
+  pagination: z.object({
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative()
+  })
+});
+
 export const TradeSchema = z.object({
   id: z.uuid(),
   symbol: z.string(),
@@ -387,6 +402,8 @@ export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
 export type AvatarResponse = z.infer<typeof AvatarResponseSchema>;
 export type AvatarFileMetadata = z.infer<typeof AvatarFileMetadataSchema>;
 export type TradeQuery = z.infer<typeof TradeQuerySchema>;
+export type OrdersQuery = z.infer<typeof OrdersQuerySchema>;
+export type PaginatedOrdersResponse = z.infer<typeof PaginatedOrdersResponseSchema>;
 export type PaginationQuery = z.infer<typeof PaginationQuerySchema>;
 export type Trade = z.infer<typeof TradeSchema>;
 export type TradesResponse = z.infer<typeof TradesResponseSchema>;
