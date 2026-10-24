@@ -352,6 +352,7 @@ export const FillSchema = z.object({
 export const LedgerEntryTypeSchema = z.enum([
   "deposit",
   "withdrawal",
+  "virtual_reset",
   "reserve",
   "release",
   "trade_debit",
@@ -364,9 +365,12 @@ export const LedgerEntrySchema = z.object({
   accountId: z.uuid(),
   fillId: z.uuid().nullable(),
   entryType: LedgerEntryTypeSchema,
-  amountPaise: z.number().int().safe().refine((value) => value !== 0),
+  amountPaise: z.number().int().safe(),
   balanceAfterPaise: paiseSchema,
   createdAt: z.iso.datetime()
+}).refine(({ entryType, amountPaise }) => entryType === "virtual_reset" || amountPaise !== 0, {
+  message: "Ledger amount must be nonzero unless it records a virtual account reset",
+  path: ["amountPaise"]
 });
 
 export const PaginatedLedgerResponseSchema = z.object({
@@ -560,6 +564,41 @@ export const ProfileResponseSchema = z.object({
   avatarUrl: z.url().nullable()
 });
 
+export const ProfileDetailsResponseSchema = ProfileResponseSchema.extend({
+  createdAt: z.iso.datetime(),
+  resetCooldownHours: z.number().int().positive(),
+  lastResetAt: z.iso.datetime().nullable(),
+  nextResetAt: z.iso.datetime().nullable()
+});
+
+export const UpdateProfileRequestSchema = z.object({
+  displayName: z.string().trim().min(2).max(60)
+});
+
+export const ChangePasswordRequestSchema = z.object({
+  currentPassword: z.string().min(1).refine((value) => new TextEncoder().encode(value).byteLength <= 72, {
+    message: "Password must be no more than 72 UTF-8 bytes"
+  }),
+  newPassword: z.string().min(12).refine((value) => new TextEncoder().encode(value).byteLength <= 72, {
+    message: "Password must be no more than 72 UTF-8 bytes"
+  })
+});
+
+export const ResetVirtualAccountResponseSchema = z.object({
+  cashBalancePaise: paiseSchema,
+  cancelledOrders: z.number().int().nonnegative().safe(),
+  clearedPositions: z.number().int().nonnegative().safe(),
+  nextResetAt: z.iso.datetime()
+});
+
+export const VirtualResetCooldownSchema = z.object({
+  cooldownHours: z.number().int().positive().max(8760)
+});
+
+export const VirtualResetCooldownResponseSchema = VirtualResetCooldownSchema.extend({
+  updatedAt: z.iso.datetime()
+});
+
 export const AvatarResponseSchema = z.object({
   avatarUrl: z.url()
 });
@@ -690,6 +729,12 @@ export type WebSocketClientMessage = z.infer<typeof WebSocketClientMessageSchema
 export type WebSocketServerMessage = z.infer<typeof WebSocketServerMessageSchema>;
 export type DomainEvent = z.infer<typeof DomainEventSchema>;
 export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
+export type ProfileDetailsResponse = z.infer<typeof ProfileDetailsResponseSchema>;
+export type UpdateProfileRequest = z.infer<typeof UpdateProfileRequestSchema>;
+export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
+export type ResetVirtualAccountResponse = z.infer<typeof ResetVirtualAccountResponseSchema>;
+export type VirtualResetCooldown = z.infer<typeof VirtualResetCooldownSchema>;
+export type VirtualResetCooldownResponse = z.infer<typeof VirtualResetCooldownResponseSchema>;
 export type AvatarResponse = z.infer<typeof AvatarResponseSchema>;
 export type AvatarFileMetadata = z.infer<typeof AvatarFileMetadataSchema>;
 export type TradeQuery = z.infer<typeof TradeQuerySchema>;

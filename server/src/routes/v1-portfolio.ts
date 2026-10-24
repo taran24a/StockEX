@@ -49,7 +49,7 @@ interface LedgerRow {
   id: string;
   account_id: string;
   fill_id: string | null;
-  entry_type: "deposit" | "withdrawal" | "reserve" | "release" | "trade_debit" | "trade_credit" | "fee";
+  entry_type: "deposit" | "withdrawal" | "virtual_reset" | "reserve" | "release" | "trade_debit" | "trade_credit" | "fee";
   amount: string | number;
   balance_after: string | number;
   created_at: Date;
@@ -64,6 +64,7 @@ interface RebuildLedgerRow {
   fill_id: string | null;
   entry_type: ReplayLedgerEntry["entryType"];
   amount: string | number;
+  created_at: Date;
 }
 
 interface RebuildFillRow {
@@ -320,7 +321,7 @@ export function createV1PortfolioRouter(pool: Pool, secret: string): Router {
     const account = await loadAccount(pool, request.auth!.id);
     const [ledgerResult, fillsResult, livePositionsResult] = await Promise.all([
       pool.query<RebuildLedgerRow>(
-        `SELECT fill_id, entry_type, amount
+        `SELECT fill_id, entry_type, amount, created_at
          FROM ledger_entries
          WHERE account_id = $1
          ORDER BY created_at ASC, id ASC`,
@@ -355,7 +356,8 @@ export function createV1PortfolioRouter(pool: Pool, secret: string): Router {
     const ledgerEntries: ReplayLedgerEntry[] = ledgerResult.rows.map((entry) => ({
       fillId: entry.fill_id,
       entryType: entry.entry_type,
-      amountPaise: databaseInteger(entry.amount, "ledger amount")
+      amountPaise: databaseInteger(entry.amount, "ledger amount"),
+      createdAt: entry.created_at
     }));
     const fills: ReplayFill[] = fillsResult.rows.map((fill) => ({
       id: fill.id,
