@@ -1,0 +1,21 @@
+meta {
+  name: Rename watchlist
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/watchlists/{{watchlistId}}
+  auth: bearer
+  body: json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Bruno watchlist renamed"
+  }
+}

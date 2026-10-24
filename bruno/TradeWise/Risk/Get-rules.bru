@@ -1,0 +1,14 @@
+meta {
+  name: Risk rules
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/risk/rules
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

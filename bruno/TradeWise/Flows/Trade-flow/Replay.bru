@@ -1,0 +1,14 @@
+meta {
+  name: 5 Order replay
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/replay
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

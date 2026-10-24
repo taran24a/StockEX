@@ -1,0 +1,14 @@
+meta {
+  name: Streamed trade statement CSV
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/portfolio/statement.csv
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

@@ -1,4 +1,5 @@
 import express from "express";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import { HealthResponseSchema } from "@tradewise/shared";
 import rateLimit from "express-rate-limit";
@@ -69,119 +70,19 @@ export function createApp(dependencies?: AppDependencies): express.Express {
     response.redirect(308, "/api/health");
   });
 
+  const openApiFile = fileURLToPath(new URL("../openapi.yaml", import.meta.url));
+  app.get("/api/docs/openapi.yaml", (_request, response, next) => {
+    response.type("application/yaml").sendFile(openApiFile, (error) => {
+      if (error !== undefined) {
+        next(error);
+      }
+    });
+  });
   app.use(
     "/api/docs",
     swaggerUi.serve,
-    swaggerUi.setup({
-      openapi: "3.1.0",
-      info: { title: "TradeWise API", version: "1.0.0" },
-      paths: {
-        "/api/v1/health": {
-          get: { summary: "Check API health", responses: { "200": { description: "API is healthy" } } }
-        },
-        "/api/health": {
-          get: { summary: "Check API health (legacy)", responses: { "200": { description: "API is healthy" } } }
-        },
-        "/api/v1/auth/register": {
-          post: {
-            summary: "Register a paper-trading account",
-            responses: { "201": { description: "Account created" } }
-          }
-        },
-        "/api/v1/auth/login": {
-          post: { summary: "Authenticate an account", responses: { "200": { description: "Authenticated" } } }
-        },
-        "/api/v1/auth/me": {
-          get: { summary: "Get the authenticated profile", responses: { "200": { description: "Profile" } } }
-        },
-        "/api/v1/auth/logout": {
-          post: { summary: "Log out the bearer-token client", responses: { "204": { description: "Logged out" } } }
-        },
-        "/api/v1/portfolio": {
-          get: { summary: "Get virtual cash, holdings, and total equity", responses: { "200": { description: "Portfolio" } } }
-        },
-        "/api/v1/portfolio/performance": {
-          get: { summary: "Get portfolio profit and loss and equity history", responses: { "200": { description: "Portfolio performance" } } }
-        },
-        "/api/v1/portfolio/verify": {
-          get: { summary: "Rebuild portfolio from the ledger and compare projections", responses: { "200": { description: "Portfolio verification" } } }
-        },
-        "/api/v1/ledger": {
-          get: { summary: "Get paginated account ledger entries", responses: { "200": { description: "Ledger entries" } } }
-        },
-        "/api/v1/orders/{id}/timeline": {
-          get: { summary: "Get the human-readable order event timeline", responses: { "200": { description: "Order timeline" } } }
-        },
-        "/api/v1/orders/{id}/replay": {
-          get: { summary: "Replay order events with account cash and holdings", responses: { "200": { description: "Order replay frames" } } }
-        },
-        "/api/v1/risk/rules": {
-          get: { summary: "Get account risk rules", responses: { "200": { description: "Risk rules" } } },
-          put: { summary: "Update account risk rules", responses: { "200": { description: "Risk rules updated" } } }
-        },
-        "/api/v1/risk/summary": {
-          get: { summary: "Get current risk concentrations and warnings", responses: { "200": { description: "Risk summary" } } }
-        },
-        "/api/v1/risk/alerts": {
-          get: { summary: "Get paginated risk alerts", responses: { "200": { description: "Risk alerts" } } }
-        },
-        "/api/v1/auth/me/avatar": {
-          post: { summary: "Upload a profile avatar", responses: { "201": { description: "Avatar uploaded" } } }
-        },
-        "/api/v1/users/me/avatar": {
-          post: { summary: "Upload a profile avatar", responses: { "201": { description: "Avatar uploaded" } } }
-        },
-        "/api/v1/portfolio/statement.csv": {
-          get: { summary: "Download a streamed trade statement", responses: { "200": { description: "CSV trade statement" } } }
-        },
-        "/api/admin/instruments/import": {
-          post: { summary: "Import instruments from CSV (admin only)", responses: { "200": { description: "Instruments imported" } } }
-        },
-        "/api/admin/users": {
-          get: { summary: "List paginated users (admin only)", responses: { "200": { description: "User page" } } }
-        },
-        "/api/admin/users/{id}/role": {
-          patch: { summary: "Update a user role (admin only)", responses: { "200": { description: "Role updated" } } }
-        },
-        "/api/admin/audit": {
-          get: { summary: "Query domain-event audit records (admin only)", responses: { "200": { description: "Audit events" } } }
-        },
-        "/api/admin/stats": {
-          get: { summary: "Get platform trading statistics (admin only)", responses: { "200": { description: "Admin statistics" } } }
-        },
-        "/api/quotes": {
-          get: { summary: "Get synthetic market quotes", responses: { "200": { description: "Current quotes" } } }
-        },
-        "/api/market/quotes": {
-          get: { summary: "Get current market quotes", responses: { "200": { description: "Current quotes" } } }
-        },
-        "/api/market/{symbol}": {
-          get: { summary: "Get instrument details and quote", responses: { "200": { description: "Instrument and quote" } } }
-        },
-        "/api/market/{symbol}/candles": {
-          get: { summary: "Get aggregated historical candles", responses: { "200": { description: "Candles" } } }
-        },
-        "/api/watchlists": {
-          get: { summary: "List owned watchlists", responses: { "200": { description: "Watchlists" } } },
-          post: { summary: "Create a watchlist", responses: { "201": { description: "Watchlist created" } } }
-        },
-        "/api/watchlists/{watchlistId}": {
-          get: { summary: "Get an owned watchlist", responses: { "200": { description: "Watchlist" } } },
-          patch: { summary: "Rename an owned watchlist", responses: { "200": { description: "Watchlist updated" } } },
-          delete: { summary: "Delete an owned watchlist", responses: { "204": { description: "Watchlist deleted" } } }
-        },
-        "/api/orders": {
-          get: { summary: "List filled paper orders", responses: { "200": { description: "Orders" } } },
-          post: { summary: "Place a paper market order", responses: { "201": { description: "Filled order" } } }
-        },
-        "/api/wallet": {
-          get: { summary: "Get virtual cash balance", responses: { "200": { description: "Wallet balance" } } }
-        },
-        "/api/portfolio": {
-          get: { summary: "Get portfolio positions", responses: { "200": { description: "Portfolio" } } }
-        },
-        "/api/trades": { get: { summary: "Get trade history", responses: { "200": { description: "Trades" } } } }
-      }
+    swaggerUi.setup(undefined, {
+      swaggerOptions: { url: "/api/docs/openapi.yaml" }
     })
   );
 

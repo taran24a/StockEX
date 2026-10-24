@@ -1,0 +1,19 @@
+meta {
+  name: Import instruments CSV
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/admin/instruments/import
+  auth: bearer
+  body: multipartForm
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:multipart-form {
+  file: @file(./admin-import.csv)
+}

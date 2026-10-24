@@ -1,0 +1,14 @@
+meta {
+  name: Ledger
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/ledger?limit=50&offset=0
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

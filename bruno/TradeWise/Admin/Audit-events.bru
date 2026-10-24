@@ -1,0 +1,14 @@
+meta {
+  name: Admin audit events
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/admin/audit?limit=50&offset=0
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}

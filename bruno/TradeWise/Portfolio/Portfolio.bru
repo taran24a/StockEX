@@ -1,0 +1,14 @@
+meta {
+  name: Portfolio
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/portfolio
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

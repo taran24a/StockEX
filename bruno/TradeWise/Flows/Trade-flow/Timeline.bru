@@ -1,0 +1,14 @@
+meta {
+  name: 4 Order timeline
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/timeline
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

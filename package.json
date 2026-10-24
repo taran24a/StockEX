@@ -20,6 +20,7 @@
     "migrate:up": "npm run build --workspace @tradewise/shared && npm run migrate:up --workspace @tradewise/server",
     "migrate:down": "npm run migrate:down --workspace @tradewise/server",
     "repl": "npm run repl --workspace @tradewise/server",
+    "demo:modules": "npm run demo:modules --workspace @tradewise/server",
     "pretypecheck": "npm run build --workspace @tradewise/shared",
     "pretest": "npm run build --workspace @tradewise/shared",
     "dev:server": "npm run build --workspace @tradewise/shared && npm run dev --workspace @tradewise/server",

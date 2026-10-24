@@ -1,0 +1,728 @@
+openapi: 3.1.0
+info:
+  title: TradeWise API
+  version: 1.0.0
+  description: |
+    Paper-trading API. All monetary values are integer paise. The market feed
+    is synthetic and no real funds or securities are traded.
+servers:
+  - url: http://localhost:3000
+tags:
+  - name: Health
+  - name: Authentication
+  - name: Market
+  - name: Orders
+  - name: Portfolio
+  - name: Risk
+  - name: Watchlists
+  - name: Administration
+  - name: Legacy
+paths:
+  /api/docs:
+    get:
+      tags: [Health]
+      summary: Open Swagger UI
+      responses:
+        "200": {description: Interactive API documentation}
+  /api/docs/openapi.yaml:
+    get:
+      tags: [Health]
+      summary: Download the hand-maintained OpenAPI document
+      responses:
+        "200":
+          description: OpenAPI 3.1 YAML document
+          content:
+            application/yaml:
+              schema: {type: string}
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: Check API health
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Health"}
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Check legacy API health
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Health"}
+  /health:
+    get:
+      tags: [Health]
+      summary: API or mock-feed health check
+      description: The API server redirects to /api/health; the mock feed server returns its health JSON.
+      servers:
+        - url: http://localhost:3000
+        - url: http://localhost:4000
+      responses:
+        "308": {description: Permanent redirect to /api/health}
+        "200": {description: Mock feed health response when using port 4000}
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register and fund a paper-trading account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RegisterRequest"}
+      responses:
+        "201": {description: Account created; includes bearer token and user}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate and receive a bearer token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LoginRequest"}
+      responses:
+        "200": {description: Authenticated}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /api/v1/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get the current user profile and avatar URL
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: User profile}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: End the current bearer-token session
+      security: [{BearerAuth: []}]
+      responses:
+        "204": {description: Logged out}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /api/v1/auth/me/avatar:
+    post:
+      tags: [Authentication]
+      summary: Upload or replace the current user's avatar
+      description: Accepts JPEG, PNG, or WebP files up to 2 MB; returns a time-limited MinIO URL.
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [avatar]
+              properties:
+                avatar: {type: string, format: binary}
+      responses:
+        "201": {description: Avatar uploaded; contains a presigned URL}
+        "413": {description: File exceeds 2 MB}
+        "415": {description: Unsupported type or invalid image contents}
+  /api/v1/users/me/avatar:
+    post:
+      tags: [Authentication]
+      summary: Upload or replace the current user's avatar
+      description: Alias for /api/v1/auth/me/avatar.
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [avatar]
+              properties:
+                avatar: {type: string, format: binary}
+      responses:
+        "201": {description: Avatar uploaded; contains a presigned URL}
+        "413": {description: File exceeds 2 MB}
+        "415": {description: Unsupported type or invalid image contents}
+  /api/market/quotes:
+    get:
+      tags: [Market]
+      summary: Get current cached market quotes
+      responses:
+        "200": {description: Synthetic quotes}
+  /api/market/{symbol}:
+    get:
+      tags: [Market]
+      summary: Get instrument details and current quote
+      parameters:
+        - $ref: "#/components/parameters/Symbol"
+      responses:
+        "200": {description: Instrument and quote details}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/market/{symbol}/candles:
+    get:
+      tags: [Market]
+      summary: Get historical candles aggregated by interval
+      parameters:
+        - $ref: "#/components/parameters/Symbol"
+        - name: interval
+          in: query
+          schema: {type: string, enum: [1m, 5m, 15m, 1h, 4h, 1d], default: 1d}
+        - name: limit
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 1000, default: 100}
+      responses:
+        "200": {description: Candle series}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/quotes:
+    get:
+      tags: [Market]
+      summary: Get current quotes from the mock market feed
+      responses:
+        "200": {description: Synthetic quote list}
+  /api/quotes/ws:
+    get:
+      tags: [Market]
+      summary: WebSocket quote stream
+      description: Upgrade to WebSocket; relays validated quote frames from the mock feed.
+      responses:
+        "101": {description: WebSocket connection established}
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      summary: Submit a paper order
+      description: Requires Idempotency-Key. Matching, balances, fills, and ledger writes are transactional.
+      security: [{BearerAuth: []}]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: {type: string, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/OrderRequest"}
+      responses:
+        "201": {description: Order accepted}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {description: Rejected by pre-trade validation or risk rules}
+    get:
+      tags: [Orders]
+      summary: List orders for the current account
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: symbol
+          in: query
+          schema: {type: string}
+        - name: side
+          in: query
+          schema: {type: string, enum: [buy, sell]}
+        - name: status
+          in: query
+          schema: {type: string, enum: [pending, open, partially_filled, filled, cancelled, rejected]}
+      responses:
+        "200": {description: Paginated orders}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /api/v1/orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Get an owned order
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200": {description: Order details}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/v1/orders/{id}/cancel:
+    post:
+      tags: [Orders]
+      summary: Cancel an open owned order
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200": {description: Cancelled order}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/v1/orders/{id}/timeline:
+    get:
+      tags: [Orders]
+      summary: Get an order's event timeline
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200": {description: Ordered domain-event timeline}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/v1/orders/{id}/replay:
+    get:
+      tags: [Orders]
+      summary: Replay an order's account effects event by event
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200": {description: Event frames with cash and holdings}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/orders:
+    post:
+      tags: [Legacy]
+      summary: Place a legacy paper market order
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LegacyOrderRequest"}
+      responses:
+        "201": {description: Filled order}
+        "422": {description: Insufficient virtual balance or holdings}
+    get:
+      tags: [Legacy]
+      summary: List legacy orders
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200": {description: Legacy order list}
+  /api/wallet:
+    get:
+      tags: [Legacy]
+      summary: Get legacy virtual wallet balance
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Balance in integer paise}
+  /api/portfolio:
+    get:
+      tags: [Legacy]
+      summary: Get legacy portfolio holdings
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Wallet and marked positions}
+  /api/trades:
+    get:
+      tags: [Legacy]
+      summary: Get paginated legacy trades
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200": {description: Trade list}
+  /api/v1/portfolio:
+    get:
+      tags: [Portfolio]
+      summary: Get cash, holdings, market value, and equity
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Current account portfolio}
+  /api/v1/portfolio/performance:
+    get:
+      tags: [Portfolio]
+      summary: Get P&L, holding contributions, and equity curve
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Portfolio performance}
+  /api/v1/portfolio/verify:
+    get:
+      tags: [Portfolio]
+      summary: Compare live projections with a ledger rebuild
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Projection match and any differences}
+  /api/v1/portfolio/statement.csv:
+    get:
+      tags: [Portfolio]
+      summary: Download a streamed trade statement
+      security: [{BearerAuth: []}]
+      responses:
+        "200":
+          description: Account-scoped CSV trade statement
+          content:
+            text/csv:
+              schema: {type: string}
+  /api/v1/ledger:
+    get:
+      tags: [Portfolio]
+      summary: Get paginated ledger entries
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200": {description: Ledger entries and pagination}
+  /api/v1/risk/rules:
+    get:
+      tags: [Risk]
+      summary: Get account risk rules
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Current risk rules}
+    put:
+      tags: [Risk]
+      summary: Update account risk rules
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [maxOrderNotionalPaise, maxSingleStockConcentrationPct, maxSectorConcentrationPct]
+              properties:
+                maxOrderNotionalPaise: {type: integer, minimum: 1}
+                maxSingleStockConcentrationPct: {type: number, exclusiveMinimum: 0, maximum: 100}
+                maxSectorConcentrationPct: {type: number, exclusiveMinimum: 0, maximum: 100}
+      responses:
+        "200": {description: Updated risk rules}
+        "400": {$ref: "#/components/responses/BadRequest"}
+  /api/v1/risk/summary:
+    get:
+      tags: [Risk]
+      summary: Get current concentration and risk warnings
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Risk summary}
+  /api/v1/risk/alerts:
+    get:
+      tags: [Risk]
+      summary: Get paginated risk alerts
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200": {description: Risk alerts}
+  /api/watchlists:
+    get:
+      tags: [Watchlists]
+      summary: List the current user's watchlists
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Watchlists}
+    post:
+      tags: [Watchlists]
+      summary: Create a watchlist
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 80}
+      responses:
+        "201": {description: Watchlist created}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/watchlists/{watchlistId}:
+    parameters:
+      - name: watchlistId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      tags: [Watchlists]
+      summary: Get an owned watchlist
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Watchlist details}
+        "404": {$ref: "#/components/responses/NotFound"}
+    patch:
+      tags: [Watchlists]
+      summary: Rename an owned watchlist
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 80}
+      responses:
+        "200": {description: Updated watchlist}
+    delete:
+      tags: [Watchlists]
+      summary: Delete an owned watchlist
+      security: [{BearerAuth: []}]
+      responses:
+        "204": {description: Watchlist deleted}
+  /api/watchlists/{watchlistId}/instruments/{symbol}:
+    parameters:
+      - name: watchlistId
+        in: path
+        required: true
+        schema: {type: string, format: uuid}
+      - $ref: "#/components/parameters/Symbol"
+    post:
+      tags: [Watchlists]
+      summary: Add an instrument to an owned watchlist
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Updated watchlist details}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      tags: [Watchlists]
+      summary: Remove an instrument from an owned watchlist
+      security: [{BearerAuth: []}]
+      responses:
+        "204": {description: Instrument removed}
+  /api/admin/instruments/import:
+    post:
+      tags: [Administration]
+      summary: Import or update instruments from CSV
+      description: Admin only. CSV header is symbol,name,sector,tick_size,last_price. Prices and tick sizes are integer paise.
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        "200": {description: Number of imported rows}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "415": {description: Upload must be a CSV file}
+  /api/admin/users:
+    get:
+      tags: [Administration]
+      summary: List users with pagination
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200": {description: User page}
+        "403": {$ref: "#/components/responses/Forbidden"}
+  /api/admin/users/{id}/role:
+    patch:
+      tags: [Administration]
+      summary: Change a user's role
+      security: [{BearerAuth: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: {type: string, enum: [user, admin]}
+      responses:
+        "200": {description: Updated user}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /api/admin/audit:
+    get:
+      tags: [Administration]
+      summary: Query domain-event audit history
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - {name: aggregateType, in: query, schema: {type: string}}
+        - {name: aggregateId, in: query, schema: {type: string, format: uuid}}
+        - {name: eventType, in: query, schema: {type: string}}
+        - {name: requestId, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: Filtered audit events}
+        "403": {$ref: "#/components/responses/Forbidden"}
+  /api/admin/stats:
+    get:
+      tags: [Administration]
+      summary: Get platform user, order, volume, and rejection statistics
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Platform statistics}
+        "403": {$ref: "#/components/responses/Forbidden"}
+  /api/auth/register:
+    post:
+      tags: [Legacy]
+      summary: Register via legacy auth path
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RegisterRequest"}
+      responses:
+        "201": {description: Account created}
+        "409": {$ref: "#/components/responses/Conflict"}
+  /api/auth/login:
+    post:
+      tags: [Legacy]
+      summary: Login via legacy auth path
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LoginRequest"}
+      responses:
+        "200": {description: Authenticated}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /api/auth/me:
+    get:
+      tags: [Legacy]
+      summary: Get profile via legacy auth path
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: User profile}
+  /api/auth/logout:
+    post:
+      tags: [Legacy]
+      summary: Logout via legacy auth path
+      security: [{BearerAuth: []}]
+      responses:
+        "204": {description: Logged out}
+  /prices:
+    get:
+      tags: [Market]
+      summary: Mock feed prices (port 4000)
+      servers:
+        - url: http://localhost:4000
+      responses:
+        "200": {description: Current synthetic feed prices}
+  /quotes:
+    get:
+      tags: [Market]
+      summary: Mock feed quotes alias (port 4000)
+      servers:
+        - url: http://localhost:4000
+      responses:
+        "200": {description: Current synthetic feed quotes}
+  /ws:
+    get:
+      tags: [Market]
+      summary: Authenticated trading WebSocket (port 3000)
+      description: |
+        On port 3000, upgrade with ?token=<JWT>. Send
+        {"type":"subscribe","channels":["quotes","orders","portfolio"]}. Quotes
+        broadcast to subscribers; order and portfolio updates are owner-only.
+        The mock-feed WebSocket also uses /ws on port 4000 and sends quote arrays.
+      responses:
+        "101": {description: WebSocket connection established}
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 100, default: 50}
+    Offset:
+      name: offset
+      in: query
+      schema: {type: integer, minimum: 0, default: 0}
+    Symbol:
+      name: symbol
+      in: path
+      required: true
+      schema: {type: string, pattern: "^[A-Z][A-Z0-9.-]{0,31}$"}
+    OrderId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ApiError"}
+    Unauthorized:
+      description: Authentication required or token invalid
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ApiError"}
+    Forbidden:
+      description: Role or ownership does not allow this operation
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ApiError"}
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ApiError"}
+    Conflict:
+      description: Resource conflict
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ApiError"}
+    UpstreamError:
+      description: Mock market feed unavailable
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ApiError"}
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, const: ok}
+    RegisterRequest:
+      type: object
+      required: [email, displayName, password]
+      properties:
+        email: {type: string, format: email}
+        displayName: {type: string, minLength: 2, maxLength: 60}
+        password: {type: string, minLength: 12, maxLength: 72}
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: {type: string, format: email}
+        password: {type: string, minLength: 1}
+    LegacyOrderRequest:
+      type: object
+      required: [symbol, side, quantity]
+      properties:
+        symbol: {type: string}
+        side: {type: string, enum: [buy, sell]}
+        quantity: {type: integer, minimum: 1}
+    OrderRequest:
+      oneOf:
+        - type: object
+          required: [symbol, side, type, quantity]
+          properties:
+            symbol: {type: string}
+            side: {type: string, enum: [buy, sell]}
+            type: {type: string, const: market}
+            quantity: {type: integer, minimum: 1}
+        - type: object
+          required: [symbol, side, type, quantity, limitPricePaise]
+          properties:
+            symbol: {type: string}
+            side: {type: string, enum: [buy, sell]}
+            type: {type: string, const: limit}
+            quantity: {type: integer, minimum: 1}
+            limitPricePaise: {type: integer, minimum: 1}
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string}
+            message: {type: string}
+            details: {}

@@ -1,0 +1,14 @@
+meta {
+  name: Risk alerts
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/v1/risk/alerts?limit=50&offset=0
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

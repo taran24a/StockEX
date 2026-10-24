@@ -1,0 +1,16 @@
+meta {
+  name: Authenticated trading WebSocket
+  type: ws
+  seq: 9
+}
+
+ws {
+  url: ws://localhost:3000/ws?token={{token}}
+}
+
+message:json {
+  {
+    "type": "subscribe",
+    "channels": ["quotes", "orders", "portfolio"]
+  }
+}

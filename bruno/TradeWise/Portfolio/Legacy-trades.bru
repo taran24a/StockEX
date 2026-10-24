@@ -1,0 +1,14 @@
+meta {
+  name: Legacy trades
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/trades?limit=50&offset=0
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

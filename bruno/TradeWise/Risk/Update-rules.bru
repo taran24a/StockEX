@@ -1,0 +1,23 @@
+meta {
+  name: Update risk rules
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/v1/risk/rules
+  auth: bearer
+  body: json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "maxOrderNotionalPaise": 5000000,
+    "maxSingleStockConcentrationPct": 45,
+    "maxSectorConcentrationPct": 60
+  }
+}

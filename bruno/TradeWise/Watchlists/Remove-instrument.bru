@@ -1,0 +1,14 @@
+meta {
+  name: Remove instrument from watchlist
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/watchlists/{{watchlistId}}/instruments/ALFA
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

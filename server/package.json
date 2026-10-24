@@ -17,7 +17,8 @@
     "seed": "node --import tsx src/db/seed.ts",
     "candles:generate": "node --import tsx src/db/generate-candles.ts",
     "candles:import": "node --import tsx src/db/import-candles.ts",
-    "repl": "node --import tsx --experimental-repl-await"
+    "repl": "node --import tsx src/repl.ts",
+    "demo:modules": "node src/demos/module-format-demo.mjs"
   },
   "dependencies": {
     "@tradewise/shared": "1.0.0",

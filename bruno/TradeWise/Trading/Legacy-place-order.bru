@@ -1,0 +1,23 @@
+meta {
+  name: Legacy place order
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/api/orders
+  auth: bearer
+  body: json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "symbol": "ALFA",
+    "side": "buy",
+    "quantity": 1
+  }
+}

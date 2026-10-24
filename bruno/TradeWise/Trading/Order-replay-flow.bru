@@ -1,0 +1,14 @@
+meta {
+  name: Order replay (trade flow)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders/{{orderId}}/replay
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

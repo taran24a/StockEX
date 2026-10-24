@@ -31,6 +31,23 @@ validationApp.use((_request, _response, next) => next(new NotFoundError()));
 validationApp.use(errorHandler);
 
 describe("GET /api/v1/health", () => {
+  it("serves the hand-maintained OpenAPI YAML through Swagger UI", async () => {
+    const docsRedirect = await request(app).get("/api/docs");
+    const docs = await request(app).get("/api/docs/");
+    const swaggerInitializer = await request(app).get("/api/docs/swagger-ui-init.js");
+    const specification = await request(app).get("/api/docs/openapi.yaml");
+
+    expect(docsRedirect.status).toBe(301);
+    expect(docsRedirect.headers.location).toBe("/api/docs/");
+    expect(docs.status).toBe(200);
+    expect(swaggerInitializer.status).toBe(200);
+    expect(swaggerInitializer.text).toContain("/api/docs/openapi.yaml");
+    expect(specification.status).toBe(200);
+    expect(specification.text).toContain("openapi: 3.1.0");
+    expect(specification.text).toContain("/api/v1/orders/{id}/timeline:");
+    expect(specification.text).toContain("/api/admin/instruments/import:");
+  });
+
   it("returns a response matching the shared health contract", async () => {
     // SYLLABUS: Postman-alternative testing
     const response = await request(app).get("/api/v1/health");

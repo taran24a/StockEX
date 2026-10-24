@@ -1,0 +1,9 @@
+meta {
+  name: Market candles
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/market/ALFA/candles?interval=1d&limit=100
+}

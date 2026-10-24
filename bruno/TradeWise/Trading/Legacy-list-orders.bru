@@ -1,0 +1,14 @@
+meta {
+  name: Legacy list orders
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/orders?limit=50&offset=0
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

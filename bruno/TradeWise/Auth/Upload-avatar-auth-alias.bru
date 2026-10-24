@@ -1,0 +1,19 @@
+meta {
+  name: Upload avatar via auth alias
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/me/avatar
+  auth: bearer
+  body: multipartForm
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:multipart-form {
+  avatar: @file(./avatar-upload-placeholder.txt)
+}

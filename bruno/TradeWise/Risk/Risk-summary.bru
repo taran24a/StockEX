@@ -1,0 +1,14 @@
+meta {
+  name: Risk summary
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/risk/summary
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

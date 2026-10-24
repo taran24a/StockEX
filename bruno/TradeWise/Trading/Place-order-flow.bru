@@ -1,0 +1,32 @@
+meta {
+  name: Place order (trade flow)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/orders
+  auth: bearer
+  body: json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+headers {
+  Idempotency-Key: {{idempotencyKey}}
+}
+
+body:json {
+  {
+    "symbol": "ALFA",
+    "side": "buy",
+    "type": "market",
+    "quantity": 1
+  }
+}
+
+script:post-response {
+  bru.setVar("orderId", res.body.order.id);
+}

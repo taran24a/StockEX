@@ -1,0 +1,14 @@
+meta {
+  name: Legacy current user
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/auth/me
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

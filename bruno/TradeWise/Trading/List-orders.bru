@@ -1,0 +1,14 @@
+meta {
+  name: List orders
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/orders?limit=50&offset=0
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

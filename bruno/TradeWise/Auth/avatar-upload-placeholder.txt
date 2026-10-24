@@ -1,0 +1,1 @@
+Replace the @file path in the avatar upload requests with a local JPEG, PNG, or WebP file.

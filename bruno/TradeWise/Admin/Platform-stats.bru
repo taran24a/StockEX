@@ -1,0 +1,14 @@
+meta {
+  name: Admin platform statistics
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/admin/stats
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}

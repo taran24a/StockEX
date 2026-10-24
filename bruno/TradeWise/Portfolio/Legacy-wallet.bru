@@ -1,0 +1,14 @@
+meta {
+  name: Legacy wallet
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/wallet
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

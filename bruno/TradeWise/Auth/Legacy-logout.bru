@@ -1,0 +1,14 @@
+meta {
+  name: Legacy logout
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/api/auth/logout
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

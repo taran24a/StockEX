@@ -1,0 +1,14 @@
+meta {
+  name: Legacy portfolio
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/portfolio
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

@@ -1,0 +1,25 @@
+meta {
+  name: Create watchlist
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/watchlists
+  auth: bearer
+  body: json
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Bruno watchlist"
+  }
+}
+
+script:post-response {
+  bru.setVar("watchlistId", res.body.id);
+}

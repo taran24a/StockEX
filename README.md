@@ -23,7 +23,7 @@ npm run dev
 
 Open <http://localhost:5173>. The API listens on port 3000, the synthetic feed on 4000, PostgreSQL on 5432, and MinIO on 9000 (console: 9001). The API creates its upload bucket when it starts, so wait for MinIO to become ready first.
 
-The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scripts include `dev`, `build`, `test`, `lint`, `seed`, `repl`, `migrate:up`, `migrate:down`, `candles:generate`, and `candles:import`. `npm run dev` runs the API, client, and separate synthetic feed process. Migration 002 adds accounts, instruments, candles, fills, ledger, events, risk, and watchlist tables while preserving existing API tables and data. `npm run migrate:down` rolls back one migration and drops its new trading-domain tables.
+The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scripts include `dev`, `build`, `test`, `lint`, `seed`, `repl`, `demo:modules`, `migrate:up`, `migrate:down`, `candles:generate`, and `candles:import`. `npm run dev` runs the API, client, and separate synthetic feed process. The REPL provides `engine` (a DEMO-symbol order book), `bus` (typed domain event bus), and `pool` (PostgreSQL pool) in its context. Run `npm run demo:modules` to see the ESM/CommonJS interoperability example. Migration 002 adds accounts, instruments, candles, fills, ledger, events, risk, and watchlist tables while preserving existing API tables and data. `npm run migrate:down` rolls back one migration and drops its new trading-domain tables.
 
 New accounts receive **100,000,000 paise (₹1,000,000)** in virtual cash. Local credentials in `.env.server.example` are for development only; set a unique `JWT_SECRET` and service credentials before deployment. Keep `.env` out of version control.
 
@@ -45,6 +45,9 @@ Invoke-RestMethod http://localhost:3000/api/v1/health
 Use `npm run migrate:up` to apply pending migrations and `npm run migrate:down` to revert the latest migration. Generate a 90-day CSV with `npm run candles:generate`; import it with `npm run candles:import -- C:\path\to\candles.csv`. The importer streams rows and can be rerun safely.
 
 Interactive API documentation is at <http://localhost:3000/api/docs>.
+The hand-maintained OpenAPI 3.1 document is [server/openapi.yaml](./server/openapi.yaml) and is served at <http://localhost:3000/api/docs/openapi.yaml>.
+
+The Bruno collection is in [bruno/TradeWise](./bruno/TradeWise). Open it in Bruno with the **Local** environment. The request sequence for register → login → place order → timeline → replay is described in [Trade-flow.md](./bruno/TradeWise/Flows/Trade-flow.md); avatar upload requests use a replaceable local-file placeholder.
 
 ## API
 
