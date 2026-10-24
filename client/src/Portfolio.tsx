@@ -3,11 +3,13 @@ import {
   PaginatedLedgerResponseSchema,
   PortfolioPerformanceResponseSchema,
   PortfolioVerifyResponseSchema,
+  RiskSummarySchema,
   type AccountHolding,
   type LedgerEntry,
-  type RiskConcentration
+  type RiskSummary
 } from "@tradewise/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { apiRequest } from "./api";
 import { useAuth } from "./auth";
@@ -17,7 +19,7 @@ import { DataTable, type DataTableColumn } from "./components/ui";
 const ledgerPageSize = 20;
 const colors = ["#86d5a0", "#70b6bd", "#b5a1e8", "#e5bc77", "#df8b91", "#85a7d6", "#9fb77b"];
 
-function PortfolioMessage({ children, error = false }: { children: string; error?: boolean }) {
+function PortfolioMessage({ children, error = false }: { children: ReactNode; error?: boolean }) {
   return <p className={`portfolio-message ${error ? "is-error" : ""}`} role={error ? "alert" : "status"}>{children}</p>;
 }
 
@@ -114,12 +116,13 @@ function AllocationDonut({
 }
 
 function allocationEntries(
-  items: RiskConcentration[] | undefined
+  items: RiskSummary["sectors"] | undefined
 ): Array<{ name: string; marketValuePaise: number; concentrationPct: number }> {
+  const total = (items ?? []).reduce((sum, item) => sum + item.marketValuePaise, 0);
   return (items ?? []).map((item) => ({
     name: item.name,
     marketValuePaise: item.marketValuePaise,
-    concentrationPct: item.concentrationPct
+    concentrationPct: total === 0 ? 0 : item.marketValuePaise / total * 100
   }));
 }
 
@@ -186,6 +189,12 @@ export function PortfolioPage() {
   const performance = useQuery({
     queryKey: ["portfolio", "performance"],
     queryFn: () => apiRequest("/api/v1/portfolio/performance", PortfolioPerformanceResponseSchema, token ?? undefined),
+    enabled: token !== null,
+    refetchInterval: 30_000
+  });
+  const riskSummary = useQuery({
+    queryKey: ["risk", "summary"],
+    queryFn: () => apiRequest("/api/risk/summary", RiskSummarySchema, token ?? undefined),
     enabled: token !== null,
     refetchInterval: 30_000
   });
@@ -278,8 +287,8 @@ export function PortfolioPage() {
                   <div><p className="workspace-eyebrow">Invested value</p><h3 id="portfolio-allocation-heading">Allocation</h3></div>
                   <span className="portfolio-allocation-total">{formatPaise(investedValue)} invested</span>
                 </div>
-                {performance.isPending ? <PortfolioMessage>Loading sector allocation…</PortfolioMessage> :
-                  performance.error instanceof Error ? <PortfolioMessage error>Sector allocation could not be loaded: {performance.error.message}</PortfolioMessage> :
+                {riskSummary.isPending ? <PortfolioMessage>Loading sector allocation…</PortfolioMessage> :
+                  riskSummary.error instanceof Error ? <PortfolioMessage error>Sector allocation could not be loaded: {riskSummary.error.message}</PortfolioMessage> :
                     <div className="portfolio-allocation-grid">
                       <AllocationDonut
                         description="Position weights"
@@ -288,7 +297,7 @@ export function PortfolioPage() {
                       />
                       <AllocationDonut
                         description="Grouped by sector"
-                        entries={allocationEntries(performance.data?.sectors)}
+                        entries={allocationEntries(riskSummary.data?.sectors)}
                         title="By sector"
                       />
                     </div>}
