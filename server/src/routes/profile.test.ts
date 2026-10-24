@@ -78,7 +78,7 @@ describe("profile routes", () => {
 
   it("changes the password only after verifying the existing bcrypt hash", async () => {
     const passwordHash = await bcrypt.hash("CorrectCurrent123", 4);
-    const query = vi.fn((sql: string) => {
+    const query = vi.fn((sql: string, _parameters?: unknown[]) => {
       if (sql === "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE") {
         return Promise.resolve({ rows: [{ password_hash: passwordHash }] });
       }
@@ -99,7 +99,7 @@ describe("profile routes", () => {
 
   it("rejects an incorrect current password without changing the stored hash", async () => {
     const passwordHash = await bcrypt.hash("CorrectCurrent123", 4);
-    const query = vi.fn((sql: string) => sql === "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE"
+    const query = vi.fn((sql: string, _parameters?: unknown[]) => sql === "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE"
       ? Promise.resolve({ rows: [{ password_hash: passwordHash }] })
       : Promise.resolve({ rows: [], rowCount: 0 }));
 

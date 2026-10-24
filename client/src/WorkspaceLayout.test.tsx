@@ -64,7 +64,7 @@ describe("authenticated workspace shell", () => {
     expect(screen.getByRole("navigation", { name: "Workspace navigation" })).toBeTruthy();
   });
 
-  it("opens the mobile navigation drawer and closes it after selecting a route", () => {
+  it("opens the mobile navigation drawer and closes it after selecting a route", async () => {
     renderWorkspace();
     const sidebar = screen.getByRole("complementary", { name: "Workspace sidebar" });
     const openButton = screen.getByRole("button", { name: "Open navigation" });
@@ -73,7 +73,7 @@ describe("authenticated workspace shell", () => {
     expect(document.activeElement).toBe(screen.getByRole("link", { name: "Dashboard" }));
     fireEvent.click(screen.getByRole("link", { name: "Profile" }));
 
-    expect(screen.getByRole("heading", { name: "Profile", level: 2 })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Profile", level: 2 })).toBeTruthy();
     expect(sidebar.className).not.toContain("is-mobile-open");
     expect(document.activeElement).toBe(openButton);
     fireEvent.click(openButton);

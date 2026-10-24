@@ -56,7 +56,7 @@ function authResponse(user: UserRow, secret: string): unknown {
 export function createAuthRouter(pool: Pool, environment: Environment, objectStorage: MinioClient): Router {
   const router = Router();
   const requireAuth = authenticate(environment.JWT_SECRET);
-  router.use(createAvatarRouter(pool, environment, objectStorage));
+  router.use(createAvatarRouter(pool, environment, objectStorage, false));
 
   router.post("/register", validateBody(RegisterRequestSchema), async (_request, response) => {
     // SYLLABUS: validation

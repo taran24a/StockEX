@@ -14,7 +14,7 @@ import {
   UpdateProfileRequestSchema,
   UserSchema
 } from "@tradewise/shared";
-import type { ChangePasswordRequest, ResetVirtualAccountRequest, UpdateProfileRequest } from "@tradewise/shared";
+import type { ChangePasswordRequest, UpdateProfileRequest } from "@tradewise/shared";
 import type { Pool } from "pg";
 import type { Environment } from "../config/index.js";
 import { withTransaction } from "../db/transaction.js";
@@ -84,131 +84,38 @@ function hasValidImageSignature(mimeType: string, buffer: Buffer): boolean {
   if (mimeType === "image/jpeg") {
     return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
   }
-  return mimeType === "image/webp" &&
+  return (
+    mimeType === "image/webp" &&
     buffer.length >= 12 &&
     buffer.toString("ascii", 0, 4) === "RIFF" &&
-    buffer.toString("ascii", 8, 12) === "WEBP";
+    buffer.toString("ascii", 8, 12) === "WEBP"
+  );
 }
 
 export function createAvatarRouter(
   pool: Pool,
   environment: Environment,
-  objectStorage: MinioClient
+  objectStorage: MinioClient,
+  includeProfileRoutes = true
 ): Router {
   const router = Router();
   const requireAuth = authenticate(environment.JWT_SECRET);
 
-  router.get("/me", requireAuth, async (request, response) => {
-    const result = await pool.query<ProfileRow>(
-      `SELECT users.id, users.email, users.display_name, users.role, users.avatar_object_key,
+  if (includeProfileRoutes) {
+    router.get("/me", requireAuth, async (request, response) => {
+      const result = await pool.query<ProfileRow>(
+        `SELECT users.id, users.email, users.display_name, users.role, users.avatar_object_key,
               users.created_at, account.last_virtual_reset_at
        FROM users
        JOIN accounts AS account ON account.user_id = users.id
        WHERE users.id = $1`,
-      [request.auth!.id]
-    );
-    const profile = result.rows[0];
-    if (profile === undefined) {
-      throw new NotFoundError("Profile or trading account was not found");
-    }
-    const settingResult = await pool.query<{ value: number | string }>(
-      "SELECT value FROM system_settings WHERE key = $1",
-      [resetCooldownSettingKey]
-    );
-    const setting = settingResult.rows[0];
-    if (setting === undefined) {
-      throw new Error("Virtual account reset cooldown setting is missing");
-    }
-    const resetCooldown = cooldownHours(setting.value);
-    const nextResetAt = profile.last_virtual_reset_at === null
-      ? null
-      : new Date(profile.last_virtual_reset_at.getTime() + resetCooldown * 60 * 60 * 1000).toISOString();
-    const avatarUrl = profile.avatar_object_key === null
-      ? null
-      : await objectStorage.presignedGetObject(environment.MINIO_BUCKET, profile.avatar_object_key, 15 * 60);
-    response.json(ProfileDetailsResponseSchema.parse({
-      user: UserSchema.parse({
-        id: profile.id,
-        email: profile.email,
-        displayName: profile.display_name,
-        role: profile.role
-      }),
-      avatarUrl,
-      createdAt: profile.created_at.toISOString(),
-      resetCooldownHours: resetCooldown,
-      lastResetAt: profile.last_virtual_reset_at?.toISOString() ?? null,
-      nextResetAt
-    }));
-  });
-
-  router.patch("/me", requireAuth, validateBody(UpdateProfileRequestSchema), async (request, response) => {
-    const input = validatedBody<UpdateProfileRequest>(response);
-    const displayName = xss(input.displayName, {
-      whiteList: {},
-      stripIgnoreTag: true,
-      stripIgnoreTagBody: ["script", "style"]
-    }).trim();
-    if (displayName.length < 2) {
-      throw new BadRequestError("Display name must contain at least two visible characters", "VALIDATION_ERROR");
-    }
-    const result = await pool.query<Pick<ProfileRow, "id" | "email" | "display_name" | "role">>(
-      `UPDATE users SET display_name = $1
-       WHERE id = $2
-       RETURNING id, email, display_name, role`,
-      [displayName, request.auth!.id]
-    );
-    const user = result.rows[0];
-    if (user === undefined) {
-      throw new NotFoundError("User was not found");
-    }
-    response.json(UserSchema.parse({
-      id: user.id,
-      email: user.email,
-      displayName: user.display_name,
-      role: user.role
-    }));
-  });
-
-  router.patch("/me/password", requireAuth, validateBody(ChangePasswordRequestSchema), async (request, response) => {
-    const input = validatedBody<ChangePasswordRequest>(response);
-    if (input.currentPassword === input.newPassword) {
-      throw new BadRequestError("New password must be different from the current password", "PASSWORD_UNCHANGED");
-    }
-    await withTransaction(pool, async (client) => {
-      const result = await client.query<{ password_hash: string }>(
-        "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE",
         [request.auth!.id]
       );
-      const current = result.rows[0];
-      if (current === undefined) {
-        throw new NotFoundError("User was not found");
+      const profile = result.rows[0];
+      if (profile === undefined) {
+        throw new NotFoundError("Profile or trading account was not found");
       }
-      if (!(await bcrypt.compare(input.currentPassword, current.password_hash))) {
-        throw new ApiError(400, "CURRENT_PASSWORD_INCORRECT", "Current password is incorrect");
-      }
-      const passwordHash = await bcrypt.hash(input.newPassword, 12);
-      await client.query(
-        "UPDATE users SET password_hash = $1 WHERE id = $2",
-        [passwordHash, request.auth!.id]
-      );
-    });
-    response.sendStatus(204);
-  });
-
-  router.post("/me/reset", requireAuth, validateBody(ResetVirtualAccountRequestSchema), async (request, response) => {
-    const input = validatedBody<ResetVirtualAccountRequest>(response);
-    const userId = request.auth!.id;
-    const result = await withTransaction(pool, async (client) => {
-      const accountResult = await client.query<ResetAccountRow>(
-        `SELECT id, user_id, cash_balance, reserved_balance, opening_balance, last_virtual_reset_at
-         FROM accounts WHERE user_id = $1 FOR UPDATE`,
-        [userId]
-      );
-      const account = accountResult.rows[0];
-      if (account === undefined) {
-        throw new NotFoundError("Trading account was not found");
-      }
-      const settingResult = await client.query<{ value: number | string }>(
+      const settingResult = await pool.query<{ value: number | string }>(
         "SELECT value FROM system_settings WHERE key = $1",
         [resetCooldownSettingKey]
       );
@@ -216,94 +123,192 @@ export function createAvatarRouter(
       if (setting === undefined) {
         throw new Error("Virtual account reset cooldown setting is missing");
       }
-      const hours = cooldownHours(setting.value);
-      const now = new Date();
-      const nextResetAt = account.last_virtual_reset_at === null
-        ? null
-        : new Date(account.last_virtual_reset_at.getTime() + hours * 60 * 60 * 1000);
-      if (nextResetAt !== null && now < nextResetAt) {
-        throw new TooManyRequestsError(
-          `Virtual account reset is available after ${nextResetAt.toISOString()}`,
-          "RESET_COOLDOWN_ACTIVE"
-        );
-      }
+      const resetCooldown = cooldownHours(setting.value);
+      const nextResetAt =
+        profile.last_virtual_reset_at === null
+          ? null
+          : new Date(profile.last_virtual_reset_at.getTime() + resetCooldown * 60 * 60 * 1000).toISOString();
+      const avatarUrl =
+        profile.avatar_object_key === null
+          ? null
+          : await objectStorage.presignedGetObject(environment.MINIO_BUCKET, profile.avatar_object_key, 15 * 60);
+      response.json(
+        ProfileDetailsResponseSchema.parse({
+          user: UserSchema.parse({
+            id: profile.id,
+            email: profile.email,
+            displayName: profile.display_name,
+            role: profile.role
+          }),
+          avatarUrl,
+          createdAt: profile.created_at.toISOString(),
+          resetCooldownHours: resetCooldown,
+          lastResetAt: profile.last_virtual_reset_at?.toISOString() ?? null,
+          nextResetAt
+        })
+      );
+    });
 
-      const openOrders = await client.query<OpenOrderRow>(
-        `SELECT id, reserved_amount FROM orders
-         WHERE account_id = $1 AND status IN ('open', 'partially_filled', 'pending')
-         FOR UPDATE`,
-        [account.id]
-      );
-      const reservedBalance = databaseInteger(account.reserved_balance, "reserved balance");
-      const totalRelease = openOrders.rows.reduce(
-        (total, order) => total + databaseInteger(order.reserved_amount, "order reservation"),
-        0
-      );
-      if (totalRelease > reservedBalance) {
-        throw new ConflictError("Open order reservations exceed the account reserved balance", "INVALID_RESERVATION");
+    router.patch("/me", requireAuth, validateBody(UpdateProfileRequestSchema), async (request, response) => {
+      const input = validatedBody<UpdateProfileRequest>(response);
+      const displayName = xss(input.displayName, {
+        whiteList: {},
+        stripIgnoreTag: true,
+        stripIgnoreTagBody: ["script", "style"]
+      }).trim();
+      if (displayName.length < 2) {
+        throw new BadRequestError("Display name must contain at least two visible characters", "VALIDATION_ERROR");
       }
-      for (const order of openOrders.rows) {
-        const reservation = databaseInteger(order.reserved_amount, "order reservation");
-        await client.query(
-          `UPDATE orders
-           SET status = 'cancelled', reserved_amount = 0, cancel_reason = 'ACCOUNT_RESET'
-           WHERE id = $1`,
-          [order.id]
+      const result = await pool.query<Pick<ProfileRow, "id" | "email" | "display_name" | "role">>(
+        `UPDATE users SET display_name = $1
+       WHERE id = $2
+       RETURNING id, email, display_name, role`,
+        [displayName, request.auth!.id]
+      );
+      const user = result.rows[0];
+      if (user === undefined) {
+        throw new NotFoundError("User was not found");
+      }
+      response.json(
+        UserSchema.parse({
+          id: user.id,
+          email: user.email,
+          displayName: user.display_name,
+          role: user.role
+        })
+      );
+    });
+
+    router.patch("/me/password", requireAuth, validateBody(ChangePasswordRequestSchema), async (request, response) => {
+      const input = validatedBody<ChangePasswordRequest>(response);
+      if (input.currentPassword === input.newPassword) {
+        throw new BadRequestError("New password must be different from the current password", "PASSWORD_UNCHANGED");
+      }
+      await withTransaction(pool, async (client) => {
+        const result = await client.query<{ password_hash: string }>(
+          "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE",
+          [request.auth!.id]
         );
-        if (reservation > 0) {
-          await client.query(
-            `INSERT INTO ledger_entries (account_id, fill_id, entry_type, amount, balance_after)
-             VALUES ($1, NULL, 'release', $2, $3)`,
-            [account.id, reservation, databaseInteger(account.cash_balance, "cash balance")]
+        const current = result.rows[0];
+        if (current === undefined) {
+          throw new NotFoundError("User was not found");
+        }
+        if (!(await bcrypt.compare(input.currentPassword, current.password_hash))) {
+          throw new ApiError(400, "CURRENT_PASSWORD_INCORRECT", "Current password is incorrect");
+        }
+        const passwordHash = await bcrypt.hash(input.newPassword, 12);
+        await client.query("UPDATE users SET password_hash = $1 WHERE id = $2", [passwordHash, request.auth!.id]);
+      });
+      response.sendStatus(204);
+    });
+
+    router.post("/me/reset", requireAuth, validateBody(ResetVirtualAccountRequestSchema), async (request, response) => {
+      const userId = request.auth!.id;
+      const result = await withTransaction(pool, async (client) => {
+        const accountResult = await client.query<ResetAccountRow>(
+          `SELECT id, user_id, cash_balance, reserved_balance, opening_balance, last_virtual_reset_at
+         FROM accounts WHERE user_id = $1 FOR UPDATE`,
+          [userId]
+        );
+        const account = accountResult.rows[0];
+        if (account === undefined) {
+          throw new NotFoundError("Trading account was not found");
+        }
+        const settingResult = await client.query<{ value: number | string }>(
+          "SELECT value FROM system_settings WHERE key = $1",
+          [resetCooldownSettingKey]
+        );
+        const setting = settingResult.rows[0];
+        if (setting === undefined) {
+          throw new Error("Virtual account reset cooldown setting is missing");
+        }
+        const hours = cooldownHours(setting.value);
+        const now = new Date();
+        const nextResetAt =
+          account.last_virtual_reset_at === null
+            ? null
+            : new Date(account.last_virtual_reset_at.getTime() + hours * 60 * 60 * 1000);
+        if (nextResetAt !== null && now < nextResetAt) {
+          throw new TooManyRequestsError(
+            `Virtual account reset is available after ${nextResetAt.toISOString()}`,
+            "RESET_COOLDOWN_ACTIVE"
           );
         }
-      }
-      const unmatchedReservation = reservedBalance - totalRelease;
-      if (unmatchedReservation > 0) {
-        await client.query(
-          `INSERT INTO ledger_entries (account_id, fill_id, entry_type, amount, balance_after)
-           VALUES ($1, NULL, 'release', $2, $3)`,
-          [account.id, unmatchedReservation, databaseInteger(account.cash_balance, "cash balance")]
-        );
-      }
 
-      const positions = await client.query(
-        "DELETE FROM positions WHERE account_id = $1",
-        [account.id]
-      );
-      const currentCash = databaseInteger(account.cash_balance, "cash balance");
-      const cashAdjustment = startingVirtualCashPaise - currentCash;
-      await client.query(
-        `INSERT INTO ledger_entries (account_id, fill_id, entry_type, amount, balance_after, created_at)
+        const openOrders = await client.query<OpenOrderRow>(
+          `SELECT id, reserved_amount FROM orders
+         WHERE account_id = $1 AND status IN ('open', 'partially_filled', 'pending')
+         FOR UPDATE`,
+          [account.id]
+        );
+        const reservedBalance = databaseInteger(account.reserved_balance, "reserved balance");
+        const totalRelease = openOrders.rows.reduce(
+          (total, order) => total + databaseInteger(order.reserved_amount, "order reservation"),
+          0
+        );
+        if (totalRelease > reservedBalance) {
+          throw new ConflictError("Open order reservations exceed the account reserved balance", "INVALID_RESERVATION");
+        }
+        for (const order of openOrders.rows) {
+          const reservation = databaseInteger(order.reserved_amount, "order reservation");
+          await client.query(
+            `UPDATE orders
+           SET status = 'cancelled', reserved_amount = 0, cancel_reason = 'ACCOUNT_RESET'
+           WHERE id = $1`,
+            [order.id]
+          );
+          if (reservation > 0) {
+            await client.query(
+              `INSERT INTO ledger_entries (account_id, fill_id, entry_type, amount, balance_after)
+             VALUES ($1, NULL, 'release', $2, $3)`,
+              [account.id, reservation, databaseInteger(account.cash_balance, "cash balance")]
+            );
+          }
+        }
+        const unmatchedReservation = reservedBalance - totalRelease;
+        if (unmatchedReservation > 0) {
+          await client.query(
+            `INSERT INTO ledger_entries (account_id, fill_id, entry_type, amount, balance_after)
+           VALUES ($1, NULL, 'release', $2, $3)`,
+            [account.id, unmatchedReservation, databaseInteger(account.cash_balance, "cash balance")]
+          );
+        }
+
+        const positions = await client.query("DELETE FROM positions WHERE account_id = $1", [account.id]);
+        const currentCash = databaseInteger(account.cash_balance, "cash balance");
+        const cashAdjustment = startingVirtualCashPaise - currentCash;
+        await client.query(
+          `INSERT INTO ledger_entries (account_id, fill_id, entry_type, amount, balance_after, created_at)
          VALUES ($1, NULL, 'virtual_reset', $2, $3, clock_timestamp())`,
-        [account.id, cashAdjustment, startingVirtualCashPaise]
-      );
-      await client.query(
-        "UPDATE wallets SET balance_paise = $1, updated_at = now() WHERE user_id = $2",
-        [startingVirtualCashPaise, account.user_id]
-      );
-      const updatedAccount = await client.query<{ last_virtual_reset_at: Date }>(
-        `UPDATE accounts
+          [account.id, cashAdjustment, startingVirtualCashPaise]
+        );
+        await client.query("UPDATE wallets SET balance_paise = $1, updated_at = now() WHERE user_id = $2", [
+          startingVirtualCashPaise,
+          account.user_id
+        ]);
+        const updatedAccount = await client.query<{ last_virtual_reset_at: Date }>(
+          `UPDATE accounts
          SET cash_balance = $2, reserved_balance = 0, last_virtual_reset_at = clock_timestamp(),
              version = version + 1, updated_at = now()
          WHERE id = $1
          RETURNING last_virtual_reset_at`,
-        [account.id, startingVirtualCashPaise]
-      );
-      const lastResetAt = updatedAccount.rows[0]?.last_virtual_reset_at;
-      if (lastResetAt === undefined) {
-        throw new Error("Virtual account reset timestamp was not returned");
-      }
-      const nextAllowedResetAt = new Date(lastResetAt.getTime() + hours * 60 * 60 * 1000);
-      return {
-        cashBalancePaise: startingVirtualCashPaise,
-        cancelledOrders: openOrders.rowCount ?? openOrders.rows.length,
-        clearedPositions: positions.rowCount ?? 0,
-        nextResetAt: nextAllowedResetAt.toISOString()
-      };
+          [account.id, startingVirtualCashPaise]
+        );
+        const lastResetAt = updatedAccount.rows[0]?.last_virtual_reset_at;
+        if (lastResetAt === undefined) {
+          throw new Error("Virtual account reset timestamp was not returned");
+        }
+        const nextAllowedResetAt = new Date(lastResetAt.getTime() + hours * 60 * 60 * 1000);
+        return {
+          cashBalancePaise: startingVirtualCashPaise,
+          cancelledOrders: openOrders.rowCount ?? openOrders.rows.length,
+          clearedPositions: positions.rowCount ?? 0,
+          nextResetAt: nextAllowedResetAt.toISOString()
+        };
+      });
+      response.json(ResetVirtualAccountResponseSchema.parse(result));
     });
-    response.json(ResetVirtualAccountResponseSchema.parse(result));
-  });
+  }
 
   router.post("/me/avatar", requireAuth, avatarUpload.single("avatar"), async (request, response) => {
     const file = request.file;
