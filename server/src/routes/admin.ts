@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { AdminUserSchema, AdminUsersResponseSchema } from "@tradewise/shared";
 import type { Pool } from "pg";
-import { authenticate, authorizeRoles } from "../middleware/authenticate.js";
+import { authenticate, requireRole } from "../middleware/authenticate.js";
 
 interface AdminUserRow {
   id: string;
@@ -17,7 +17,7 @@ export function createAdminRouter(pool: Pool, secret: string): Router {
   router.get(
     "/users",
     authenticate(secret),
-    authorizeRoles("admin"),
+    requireRole("admin"),
     async (_request, response) => {
       const result = await pool.query<AdminUserRow>(
         `SELECT id, email, display_name, role, created_at

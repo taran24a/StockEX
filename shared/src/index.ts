@@ -41,6 +41,7 @@ export const AdminUsersResponseSchema = z.object({
 
 export const AuthResponseSchema = z.object({
   token: z.string().min(1),
+  expiresAt: z.iso.datetime(),
   user: UserSchema
 });
 

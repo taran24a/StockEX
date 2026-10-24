@@ -1,7 +1,8 @@
 import type { RequestHandler } from "express";
+import type { Request } from "express";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { ApiError } from "../services/errors.js";
+import { ForbiddenError, UnauthorizedError } from "../services/errors.js";
 
 const ClaimsSchema = z.object({
   sub: z.uuid(),
@@ -26,32 +27,48 @@ export function authenticate(secret: string): RequestHandler {
     const authorization = request.header("authorization")?.split(" ");
     const [scheme, token, ...extra] = authorization ?? [];
     if (scheme !== "Bearer" || token === undefined || token.length === 0 || extra.length > 0) {
-      next(new ApiError(401, "UNAUTHORIZED", "A valid bearer token is required"));
+      next(new UnauthorizedError("A valid bearer token is required"));
       return;
     }
 
     try {
       const payload = jwt.verify(token, secret);
       if (typeof payload === "string") {
-        throw new ApiError(401, "UNAUTHORIZED", "The bearer token is invalid");
+        throw new UnauthorizedError("The bearer token is invalid");
       }
       const claims = ClaimsSchema.safeParse(payload);
       if (!claims.success) {
-        throw new ApiError(401, "UNAUTHORIZED", "The bearer token is invalid");
+        throw new UnauthorizedError("The bearer token is invalid");
       }
       request.auth = { id: claims.data.sub, role: claims.data.role };
       next();
     } catch (error) {
-      next(error instanceof ApiError ? error : new ApiError(401, "UNAUTHORIZED", "The bearer token is invalid or expired"));
+      next(error instanceof UnauthorizedError ? error : new UnauthorizedError("The bearer token is invalid or expired"));
     }
   };
 }
 
 // SYLLABUS: role-based access
-export function authorizeRoles(...roles: AuthenticatedUser["role"][]): RequestHandler {
+export function requireRole(...roles: AuthenticatedUser["role"][]): RequestHandler {
   return (request, _response, next) => {
     if (request.auth === undefined || !roles.includes(request.auth.role)) {
-      next(new ApiError(403, "FORBIDDEN", "Your account role cannot access this resource"));
+      next(new ForbiddenError("Your account role cannot access this resource"));
+      return;
+    }
+    next();
+  };
+}
+
+export const authorizeRoles = requireRole;
+
+export function requireOwnership(ownerId: (request: Request) => string | undefined): RequestHandler {
+  return (request, _response, next) => {
+    if (request.auth === undefined) {
+      next(new UnauthorizedError());
+      return;
+    }
+    if (ownerId(request) !== request.auth.id) {
+      next(new ForbiddenError("You do not own this resource"));
       return;
     }
     next();

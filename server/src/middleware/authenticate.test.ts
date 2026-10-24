@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { ErrorResponseSchema } from "@tradewise/shared";
-import { authenticate, authorizeRoles } from "./authenticate.js";
+import { authenticate, requireRole } from "./authenticate.js";
 
 const secret = "test-secret-long-enough-for-the-test-suite";
 const userId = "4b8fbe96-52f4-45b9-a373-195af22bcf22";
@@ -13,7 +13,7 @@ function protectedApp() {
   app.get(
     "/admin",
     authenticate(secret),
-    authorizeRoles("admin"),
+    requireRole("admin"),
     (request, response) => response.json({ userId: request.auth?.id })
   );
   app.use((error: unknown, _request: express.Request, response: express.Response, _next: express.NextFunction) => {

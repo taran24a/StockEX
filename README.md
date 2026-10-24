@@ -49,8 +49,8 @@ Interactive API documentation is at <http://localhost:3000/api/docs>.
 ## API
 
 - `GET /api/v1/health`
-- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
-- `POST /api/auth/me/avatar` (JPEG, PNG, or WebP; 2 MB maximum; stored in MinIO)
+- `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`
+- `POST /api/v1/auth/me/avatar` (JPEG, PNG, or WebP; 2 MB maximum; stored in MinIO)
 - `GET /api/quotes` and `GET /api/quotes/ws`
 - `GET /api/wallet`, `GET /api/portfolio`
 - `POST /api/orders`, `GET /api/orders`, `GET /api/trades`
@@ -58,6 +58,8 @@ Interactive API documentation is at <http://localhost:3000/api/docs>.
 
 Administrators also see a read-only user directory in the dashboard, backed by this endpoint.
 
-Authenticated endpoints require a bearer token in the `Authorization` header. Requests and responses use Zod schemas exported from `shared/`. Order execution is a pure TypeScript matching function; PostgreSQL transactions lock and update the wallet/position together with the order and trade records. Paise values remain safe integers in application code and are stored as `NUMERIC(20,0)` in PostgreSQL.
+Authenticated endpoints require a bearer token in the `Authorization` header. Registration and login return a 12-hour token and its `expiresAt` timestamp. Logout is stateless: the client must discard its bearer token. Run `npm run seed` to create/update the local demo account (`demo@tradewise.dev` / `Demo@1234`) and admin account (`admin@tradewise.dev` / `Admin@1234`), each with a ₹10,00,000 virtual balance on first creation.
+
+Requests and responses use Zod schemas exported from `shared/`. Order execution is a pure TypeScript matching function; PostgreSQL transactions lock and update the wallet/position together with the order and trade records. Paise values remain safe integers in application code and are stored as `NUMERIC(20,0)` in PostgreSQL.
 
 The synthetic feed exposes quotes over HTTP and WebSocket at port 4000. API clients can subscribe to its validated updates at `/api/quotes/ws`. No market prices are embedded in the React client.

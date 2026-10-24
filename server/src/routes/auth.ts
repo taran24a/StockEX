@@ -64,17 +64,22 @@ function hasValidImageSignature(mimeType: string, buffer: Buffer): boolean {
     buffer.toString("ascii", 8, 12) === "WEBP";
 }
 
-function createToken(user: UserRow, secret: string): string {
+const accessTokenLifetimeSeconds = 12 * 60 * 60;
+
+function createToken(user: UserRow, secret: string): { token: string; expiresAt: string } {
   // SYLLABUS: JWT
-  return jwt.sign({ role: user.role }, secret, {
-    subject: user.id,
-    expiresIn: "12h"
-  });
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const expiresAt = issuedAt + accessTokenLifetimeSeconds;
+  return {
+    token: jwt.sign({ role: user.role, iat: issuedAt, exp: expiresAt }, secret, { subject: user.id }),
+    expiresAt: new Date(expiresAt * 1000).toISOString()
+  };
 }
 
 function authResponse(user: UserRow, secret: string): unknown {
+  const accessToken = createToken(user, secret);
   return AuthResponseSchema.parse({
-    token: createToken(user, secret),
+    ...accessToken,
     user: {
       id: user.id,
       email: user.email,
@@ -115,7 +120,10 @@ export function createAuthRouter(pool: Pool, environment: Environment, objectSto
         if (createdUser === undefined) {
           throw new Error("User insert returned no row");
         }
-        await client.query("INSERT INTO wallets (user_id) VALUES ($1)", [createdUser.id]);
+        await client.query(
+          "INSERT INTO wallets (user_id, balance_paise) VALUES ($1, $2)",
+          [createdUser.id, 100_000_000]
+        );
         return createdUser;
       });
       response.status(201).json(authResponse(user, environment.JWT_SECRET));
@@ -163,6 +171,10 @@ export function createAuthRouter(pool: Pool, environment: Environment, objectSto
       }),
       avatarUrl
     }));
+  });
+
+  router.post("/logout", requireAuth, (_request, response) => {
+    response.sendStatus(204);
   });
 
   router.post("/me/avatar", requireAuth, avatarUpload.single("avatar"), async (request, response) => {

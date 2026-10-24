@@ -1,52 +1,41 @@
 import bcrypt from "bcrypt";
-import { RegisterRequestSchema } from "@tradewise/shared";
 import { createDatabasePool } from "./pool.js";
 import { withTransaction } from "./transaction.js";
 import { loadEnvironment } from "../config/index.js";
 
 const environment = loadEnvironment();
-const input = RegisterRequestSchema.safeParse({
-  email: process.env.SEED_EMAIL,
-  displayName: process.env.SEED_DISPLAY_NAME,
-  password: process.env.SEED_PASSWORD
-});
-
-if (!input.success) {
-  throw new Error("Set valid SEED_EMAIL, SEED_DISPLAY_NAME, and SEED_PASSWORD values before running the seed script");
-}
-
 const pool = createDatabasePool(environment);
+const seedUsers = [
+  { email: "demo@tradewise.dev", displayName: "TradeWise Demo", password: "Demo@1234", role: "user" },
+  { email: "admin@tradewise.dev", displayName: "TradeWise Admin", password: "Admin@1234", role: "admin" }
+] as const;
 
 try {
-  const passwordHash = await bcrypt.hash(input.data.password, 12);
-  const accountState = await withTransaction(pool, async (client) => {
-    const inserted = await client.query<{ id: string }>(
-      `INSERT INTO users (email, display_name, password_hash)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (email) DO NOTHING
-       RETURNING id`,
-      [input.data.email.toLowerCase(), input.data.displayName, passwordHash]
-    );
-    let userId = inserted.rows[0]?.id;
-    const wasCreated = userId !== undefined;
-
-    if (userId === undefined) {
-      const existing = await client.query<{ id: string }>("SELECT id FROM users WHERE email = $1", [
-        input.data.email.toLowerCase()
-      ]);
-      userId = existing.rows[0]?.id;
+  await withTransaction(pool, async (client) => {
+    for (const seedUser of seedUsers) {
+      const passwordHash = await bcrypt.hash(seedUser.password, 12);
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO users (email, display_name, password_hash, role)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (email) DO UPDATE
+         SET display_name = EXCLUDED.display_name,
+             password_hash = EXCLUDED.password_hash,
+             role = EXCLUDED.role
+         RETURNING id`,
+        [seedUser.email, seedUser.displayName, passwordHash, seedUser.role]
+      );
+      const userId = inserted.rows[0]?.id;
       if (userId === undefined) {
-        throw new Error("The seed account could not be created or found");
+        throw new Error(`Could not seed user ${seedUser.email}`);
       }
+      await client.query(
+        "INSERT INTO wallets (user_id, balance_paise) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING",
+        [userId, 100_000_000]
+      );
     }
-
-    await client.query("INSERT INTO wallets (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING", [userId]);
-    return wasCreated;
   });
 
-  console.info(
-    accountState ? "Seed account created" : "Seed account already exists; existing credentials were preserved"
-  );
+  console.info("TradeWise admin and demo accounts are ready");
 } finally {
   await pool.end();
 }

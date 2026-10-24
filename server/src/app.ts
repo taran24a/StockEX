@@ -76,19 +76,22 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         "/api/health": {
           get: { summary: "Check API health (legacy)", responses: { "200": { description: "API is healthy" } } }
         },
-        "/api/auth/register": {
+        "/api/v1/auth/register": {
           post: {
             summary: "Register a paper-trading account",
             responses: { "201": { description: "Account created" } }
           }
         },
-        "/api/auth/login": {
+        "/api/v1/auth/login": {
           post: { summary: "Authenticate an account", responses: { "200": { description: "Authenticated" } } }
         },
-        "/api/auth/me": {
+        "/api/v1/auth/me": {
           get: { summary: "Get the authenticated profile", responses: { "200": { description: "Profile" } } }
         },
-        "/api/auth/me/avatar": {
+        "/api/v1/auth/logout": {
+          post: { summary: "Log out the bearer-token client", responses: { "204": { description: "Logged out" } } }
+        },
+        "/api/v1/auth/me/avatar": {
           post: { summary: "Upload a profile avatar", responses: { "201": { description: "Avatar uploaded" } } }
         },
         "/api/quotes": {
@@ -118,7 +121,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
   if (dependencies !== undefined) {
     const { pool, environment, objectStorage } = dependencies;
     app.use(
-      "/api/auth",
+      ["/api/v1/auth", "/api/auth"],
       rateLimit({
         windowMs: 15 * 60_000,
         limit: 20,
@@ -127,7 +130,9 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         handler: (_request, _response, next) => next(new TooManyRequestsError())
       })
     );
-    app.use("/api/auth", createAuthRouter(pool, environment, objectStorage));
+    const authRouter = createAuthRouter(pool, environment, objectStorage);
+    app.use("/api/v1/auth", authRouter);
+    app.use("/api/auth", authRouter);
     app.use("/api/admin", createAdminRouter(pool, environment.JWT_SECRET));
     app.use("/api/quotes", createQuotesRouter(environment.MOCK_FEED_URL));
     app.use("/api", createPortfolioRouter(pool, environment.JWT_SECRET, environment.MOCK_FEED_URL));
