@@ -119,9 +119,9 @@ describe("risk workspace", () => {
     renderRiskPage();
     expect(await screen.findByRole("meter", { name: /Stock ALFA concentration/ })).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("Maximum single-stock concentration (%)"), { target: { value: "101" } });
+    fireEvent.change(screen.getByLabelText(/Maximum single-stock concentration/), { target: { value: "101" } });
     fireEvent.click(screen.getByRole("button", { name: "Save risk limits" }));
-    expect(screen.getByLabelText("Maximum single-stock concentration (%)").getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByLabelText(/Maximum single-stock concentration/).getAttribute("aria-invalid")).toBe("true");
     expect(apiRequestMock).not.toHaveBeenCalledWith(
       "/api/v1/risk/rules",
       expect.anything(),
@@ -129,7 +129,7 @@ describe("risk workspace", () => {
       expect.objectContaining({ method: "PUT" })
     );
 
-    fireEvent.change(screen.getByLabelText("Maximum single-stock concentration (%)"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText(/Maximum single-stock concentration/), { target: { value: "50" } });
     fireEvent.click(screen.getByRole("button", { name: "Save risk limits" }));
     await waitFor(() => expect(apiRequestMock).toHaveBeenCalledWith(
       "/api/v1/risk/rules",

@@ -388,6 +388,26 @@ paths:
       security: [{BearerAuth: []}]
       responses:
         "200": {description: Risk summary}
+  /api/v1/risk/preview:
+    post:
+      tags: [Risk]
+      summary: Preview the concentration impact of a hypothetical order
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [symbol, side, quantity]
+              properties:
+                symbol: {type: string, pattern: "^[A-Z][A-Z0-9.-]{0,31}$"}
+                side: {type: string, enum: [buy, sell]}
+                quantity: {type: integer, minimum: 1}
+      responses:
+        "200": {description: Current and projected concentration with any risk rejection reason}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/NotFound"}
   /api/v1/risk/alerts:
     get:
       tags: [Risk]
@@ -398,6 +418,28 @@ paths:
         - $ref: "#/components/parameters/Offset"
       responses:
         "200": {description: Risk alerts}
+  /api/v1/risk/alerts/{alertId}:
+    patch:
+      tags: [Risk]
+      summary: Mark an account risk alert read or unread
+      security: [{BearerAuth: []}]
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acknowledged]
+              properties:
+                acknowledged: {type: boolean}
+      responses:
+        "200": {description: Updated risk alert}
+        "404": {$ref: "#/components/responses/NotFound"}
   /api/watchlists:
     get:
       tags: [Watchlists]

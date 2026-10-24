@@ -11,7 +11,7 @@ import {
   type RiskRulesInput
 } from "@tradewise/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { z } from "zod";
 import { apiRequest } from "./api";
 import { useAuth } from "./auth";
@@ -34,7 +34,7 @@ function toneForConcentration(concentrationPct: number, limitPct: number): RiskT
   return "safe";
 }
 
-function RiskMessage({ children, error = false }: { children: string; error?: boolean }) {
+function RiskMessage({ children, error = false }: { children: ReactNode; error?: boolean }) {
   return <p className={`risk-message ${error ? "is-error" : ""}`} role={error ? "alert" : "status"}>{children}</p>;
 }
 
@@ -127,12 +127,14 @@ function RulesForm({ token, onSaved }: { token: string; onSaved(): Promise<void>
       maxSectorConcentrationPct: Number(parsedValues.maxSectorConcentration)
     });
     if (!rulesResult.success) {
-      const messages = rulesResult.error.issues.map((issue) => issue.message);
-      setErrors({
-        maxOrderNotional: messages[0],
-        maxSingleStockConcentration: messages[1],
-        maxSectorConcentration: messages[2]
-      });
+      const nextErrors: RuleFormErrors = {};
+      for (const issue of rulesResult.error.issues) {
+        const field = issue.path[0];
+        if (field === "maxOrderNotionalPaise") nextErrors.maxOrderNotional = issue.message;
+        if (field === "maxSingleStockConcentrationPct") nextErrors.maxSingleStockConcentration = issue.message;
+        if (field === "maxSectorConcentrationPct") nextErrors.maxSectorConcentration = issue.message;
+      }
+      setErrors(nextErrors);
       return;
     }
     setErrors({});

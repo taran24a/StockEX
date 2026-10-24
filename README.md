@@ -67,6 +67,7 @@ The Bruno collection is in [bruno/TradeWise](./bruno/TradeWise). Open it in Brun
 The protected `/app/markets` workspace provides searchable, sector-filtered instruments, live quotes, watchlist actions, candlestick intervals, aggregated open-order depth, and risk-checked market/limit order tickets.
 The protected `/app/orders` workspace supports URL-backed status, side, symbol, and date filters, paginated order history, open-order cancellation, event timelines, and step-by-step cash/holdings replay. Authenticated order WebSocket updates refresh the visible order list.
 The protected `/app/portfolio` workspace shows holdings and per-position P&L, stock and sector allocation, performance contributions, paginated ledger activity, a downloadable CSV statement, and ledger-replay verification.
+The protected `/app/risk` workspace edits account trading limits, displays concentration gauges and read/unread risk alerts, and previews hypothetical buy/sell concentration through `POST /api/v1/risk/preview` without placing an order.
 
 Administrators also see a read-only user directory in the dashboard, backed by this endpoint.
 
