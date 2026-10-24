@@ -59,7 +59,7 @@ function projectedConcentration(
   rule: RiskRejection["rule"]
 ): RiskRejection | null {
   const direction = side === "buy" ? orderNotional : -orderNotional;
-  const projectedExposure = inputSideExposure(currentExposure + direction);
+  const projectedExposure = currentExposure + direction < 0n ? 0n : currentExposure + direction;
   const currentPct = roundedPercent(currentExposure, totalEquity);
   const projectedPct = roundedPercent(projectedExposure, totalEquity);
   const limitBasisPoints = Math.round(limitPct * 100);
@@ -71,10 +71,6 @@ function projectedConcentration(
       currentPct,
       projectedPct
     };
-  }
-
-  function inputSideExposure(exposure: bigint): bigint {
-    return exposure < 0n ? 0n : exposure;
   }
   return null;
 }

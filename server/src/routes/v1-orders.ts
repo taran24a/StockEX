@@ -2,7 +2,9 @@ import { createHash, randomUUID } from "node:crypto";
 import { Router } from "express";
 import {
   OrderRequestSchema,
+  OrderReplayResponseSchema,
   OrderResponseSchema,
+  OrderTimelineResponseSchema,
   OrdersQuerySchema,
   PaginatedOrdersResponseSchema
 } from "@tradewise/shared";
@@ -30,6 +32,15 @@ import type {
   ExistingRiskHolding,
   PreTradeRiskRules
 } from "../services/pre-trade-risk.js";
+import {
+  humanizeOrderEvent,
+  replayPortfolioEvents
+} from "../services/portfolio-replay.js";
+import type {
+  ReplayEvent,
+  ReplayFill,
+  ReplayLedgerEntry
+} from "../services/portfolio-replay.js";
 
 const IdParamsSchema = z.object({ id: z.uuid() });
 const IdempotencyKeySchema = z.string().trim().min(1).max(128);
@@ -89,6 +100,31 @@ interface FillEvent {
   takerAccountId: string;
   makerFeePaise: number;
   takerFeePaise: number;
+}
+
+interface DomainEventRow {
+  id: string;
+  aggregate_id: string;
+  event_type: string;
+  sequence_number: string | number;
+  payload: Record<string, unknown>;
+  created_at: Date;
+}
+
+interface ReplayLedgerRow {
+  fill_id: string | null;
+  entry_type: ReplayLedgerEntry["entryType"];
+  amount: string | number;
+}
+
+interface ReplayFillRow {
+  id: string;
+  symbol: string;
+  side: OrderSide;
+  quantity: string | number;
+  price: string | number;
+  executed_at: Date;
+  execution_sequence: string | number;
 }
 
 function fingerprint(body: OrderRequest): string {
@@ -274,6 +310,17 @@ async function persistOrder(
       state.filledQuantity, state.idempotencyKey, state.reservedAmount, state.reason ?? null, createdAt
     ]
   );
+  const validated = await recordEvent(client, state.id, "ORDER_VALIDATED", {
+    orderId: state.id,
+    symbol: state.symbol,
+    side: state.side,
+    type: state.type,
+    quantity: state.quantity
+  }, requestId);
+  const riskCheck = await recordEvent(client, state.id, "RISK_CHECK_PASSED", {
+    orderId: state.id,
+    symbol: state.symbol
+  }, requestId);
   const accepted = await recordEvent(client, state.id, "ORDER_ACCEPTED", {
     orderId: state.id,
     symbol: state.symbol,
@@ -281,7 +328,7 @@ async function persistOrder(
     type: state.type,
     quantity: state.quantity
   }, requestId);
-  state.pendingEvents.push(accepted);
+  state.pendingEvents.push(validated, riskCheck, accepted);
 }
 
 export function createV1OrdersRouter(
@@ -422,6 +469,18 @@ export function createV1OrdersRouter(
             createdAt
           ]
         );
+        const validationEvent = await recordEvent(client, orderId, "ORDER_VALIDATED", {
+          orderId,
+          symbol: input.symbol,
+          side: input.side,
+          type: input.type,
+          quantity: input.quantity
+        }, requestId);
+        const failedRiskEvent = await recordEvent(client, orderId, "RISK_CHECK_FAILED", {
+          orderId,
+          rule: riskRejection.rule,
+          reason: riskRejection.message
+        }, requestId);
         const event = await recordEvent(client, orderId, "RISK_REJECTED", {
           orderId,
           rule: riskRejection.rule,
@@ -460,7 +519,7 @@ export function createV1OrdersRouter(
         return {
           response: rejectionResponse,
           statusCode: 422,
-          events: [event],
+          events: [validationEvent, failedRiskEvent, event],
           fills: [],
           replay: false
         };
@@ -572,6 +631,11 @@ export function createV1OrdersRouter(
       const createdAt = new Date();
       await persistOrder(client, incoming, createdAt, referencePrice, requestId);
       recordedEvents.push(...incoming.pendingEvents);
+      recordedEvents.push(await recordEvent(client, orderId, "ORDER_MATCHED", {
+        orderId,
+        symbol: input.symbol,
+        fillCount: incomingFills.length
+      }, requestId));
 
       for (const fill of incomingFills) {
         const makerRow = restingById.get(fill.makerOrderId);
@@ -741,7 +805,7 @@ export function createV1OrdersRouter(
         }, requestId));
       } else if (incoming.status === "open" || incoming.status === "partially_filled") {
         recordedEvents.push(await recordEvent(client, orderId, "ORDER_OPEN", {
-          orderId, status: incoming.status
+          orderId, status: incoming.status, reservedAmountPaise: incoming.reservedAmount
         }, requestId));
       }
 
@@ -762,6 +826,137 @@ export function createV1OrdersRouter(
       eventBus.emit("fill", fill);
     }
     response.status(result.statusCode).json(result.response);
+  });
+
+  router.get("/:id/timeline", requireAuth, validateParams(IdParamsSchema), async (request, response) => {
+    const { id } = validatedParams<z.infer<typeof IdParamsSchema>>(response);
+    const ownedOrder = await pool.query<{ id: string }>(
+      "SELECT id FROM orders WHERE id = $1 AND user_id = $2",
+      [id, request.auth!.id]
+    );
+    if (ownedOrder.rows[0] === undefined) {
+      throw new NotFoundError("Order was not found");
+    }
+    const result = await pool.query<DomainEventRow>(
+      `SELECT id, aggregate_id, event_type, sequence_number, payload, created_at
+       FROM domain_events
+       WHERE aggregate_type = 'order' AND aggregate_id = $1
+       ORDER BY sequence_number ASC`,
+      [id]
+    );
+    response.json(OrderTimelineResponseSchema.parse({
+      orderId: id,
+      events: result.rows.map((event) => ({
+        id: event.id,
+        eventType: event.event_type,
+        sequenceNumber: databaseInteger(event.sequence_number, "event sequence"),
+        message: humanizeOrderEvent(event.event_type, event.payload),
+        payload: event.payload,
+        createdAt: event.created_at.toISOString()
+      }))
+    }));
+  });
+
+  router.get("/:id/replay", requireAuth, validateParams(IdParamsSchema), async (request, response) => {
+    const { id } = validatedParams<z.infer<typeof IdParamsSchema>>(response);
+    const ownedOrder = await pool.query<{ id: string; account_id: string; opening_balance: string | number }>(
+      `SELECT orders.id, orders.account_id, accounts.opening_balance
+       FROM orders
+       JOIN accounts ON accounts.id = orders.account_id
+       WHERE orders.id = $1 AND orders.user_id = $2`,
+      [id, request.auth!.id]
+    );
+    const order = ownedOrder.rows[0];
+    if (order === undefined) {
+      throw new NotFoundError("Order was not found");
+    }
+
+    const [targetEventsResult, accountEventsResult, ledgerResult, fillsResult] = await Promise.all([
+      pool.query<DomainEventRow>(
+        `SELECT id, aggregate_id, event_type, sequence_number, payload, created_at
+         FROM domain_events
+         WHERE aggregate_type = 'order' AND aggregate_id = $1
+         ORDER BY sequence_number ASC`,
+        [id]
+      ),
+      pool.query<DomainEventRow>(
+        `SELECT event.id, event.aggregate_id, event.event_type, event.sequence_number,
+                event.payload, event.created_at
+         FROM domain_events AS event
+         JOIN orders AS owned_order ON owned_order.id = event.aggregate_id
+         WHERE event.aggregate_type = 'order' AND owned_order.account_id = $1
+         ORDER BY event.created_at ASC, event.aggregate_id ASC, event.sequence_number ASC`,
+        [order.account_id]
+      ),
+      pool.query<ReplayLedgerRow>(
+        `SELECT fill_id, entry_type, amount
+         FROM ledger_entries WHERE account_id = $1
+         ORDER BY created_at ASC, id ASC`,
+        [order.account_id]
+      ),
+      pool.query<ReplayFillRow>(
+        `SELECT fill.id, instrument.symbol, own_order.side, fill.quantity, fill.price,
+                fill.executed_at, fill.execution_sequence
+         FROM fills AS fill
+         JOIN orders AS own_order ON own_order.id = fill.order_id
+         JOIN instruments AS instrument ON instrument.id = own_order.instrument_id
+         WHERE own_order.account_id = $1
+         UNION ALL
+         SELECT fill.id, instrument.symbol, counter_order.side, fill.quantity, fill.price,
+                fill.executed_at, fill.execution_sequence
+         FROM fills AS fill
+         JOIN orders AS counter_order ON counter_order.id = fill.counter_order_id
+         JOIN instruments AS instrument ON instrument.id = counter_order.instrument_id
+         WHERE counter_order.account_id = $1
+         ORDER BY executed_at ASC, id ASC`,
+        [order.account_id]
+      )
+    ]);
+
+    const accountEvents: ReplayEvent[] = accountEventsResult.rows.map((event) => ({
+      id: event.id,
+      aggregateId: event.aggregate_id,
+      eventType: event.event_type,
+      sequenceNumber: databaseInteger(event.sequence_number, "event sequence"),
+      payload: event.payload,
+      createdAt: event.created_at
+    }));
+    const targetEvents: ReplayEvent[] = targetEventsResult.rows.map((event) => ({
+      id: event.id,
+      aggregateId: event.aggregate_id,
+      eventType: event.event_type,
+      sequenceNumber: databaseInteger(event.sequence_number, "event sequence"),
+      payload: event.payload,
+      createdAt: event.created_at
+    }));
+    const ledgerEntries: ReplayLedgerEntry[] = ledgerResult.rows.map((entry) => ({
+      fillId: entry.fill_id,
+      entryType: entry.entry_type,
+      amountPaise: databaseInteger(entry.amount, "ledger amount")
+    }));
+    const fills: ReplayFill[] = fillsResult.rows.map((fill) => ({
+      id: fill.id,
+      symbol: fill.symbol,
+      side: fill.side,
+      quantity: databaseInteger(fill.quantity, "fill quantity"),
+      pricePaise: databaseInteger(fill.price, "fill price"),
+      executedAt: fill.executed_at,
+      executionSequence: databaseInteger(fill.execution_sequence, "fill execution sequence")
+    }));
+    const initialCash = databaseInteger(order.opening_balance, "account opening balance") + ledgerEntries
+      .filter((entry) => entry.entryType === "deposit")
+      .reduce((total, entry) => total + entry.amountPaise, 0);
+    const frames = replayPortfolioEvents(
+      initialCash,
+      accountEvents,
+      targetEvents,
+      ledgerEntries,
+      fills
+    );
+    response.json(OrderReplayResponseSchema.parse({
+      orderId: id,
+      frames: frames.map(({ reservedBalancePaise: _reserved, ...frame }) => frame)
+    }));
   });
 
   router.get("/", requireAuth, validateQuery(OrdersQuerySchema), async (request, response) => {
@@ -895,7 +1090,9 @@ export function createV1OrdersRouter(
       );
       await ledger(client, row.id, null, "release", reservation, databaseInteger(row.cash_balance, "cash balance"));
       const event = await recordEvent(client, id, "ORDER_CANCELLED", {
-        orderId: id, reason: "USER_CANCELLED"
+        orderId: id,
+        reason: "USER_CANCELLED",
+        releasedReservationPaise: reservation
       }, requestId);
       return { event, reservation };
     });

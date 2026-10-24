@@ -132,4 +132,76 @@ describe("v1 portfolio routes", () => {
     });
     expect(query).toHaveBeenCalledWith(expect.stringContaining("LIMIT $2 OFFSET $3"), [accountId, 10, 5]);
   });
+
+  it("verifies the live position and cash projection against a rebuilt series of fills", async () => {
+    const fillRows = [
+      {
+        id: "10000000-0000-4000-8000-000000000001",
+        symbol: "ALFA",
+        side: "buy",
+        quantity: "10",
+        price: "100",
+        executed_at: new Date("2026-10-25T10:00:00.000Z"),
+        execution_sequence: "1"
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000002",
+        symbol: "ALFA",
+        side: "buy",
+        quantity: "5",
+        price: "160",
+        executed_at: new Date("2026-10-25T10:01:00.000Z"),
+        execution_sequence: "2"
+      },
+      {
+        id: "10000000-0000-4000-8000-000000000003",
+        symbol: "ALFA",
+        side: "sell",
+        quantity: "8",
+        price: "200",
+        executed_at: new Date("2026-10-25T10:02:00.000Z"),
+        execution_sequence: "3"
+      }
+    ];
+    const query = vi.fn((sql: string) => {
+      if (sql.includes("FROM accounts")) {
+        return Promise.resolve({
+          rows: [{
+            id: accountId,
+            cash_balance: "9797",
+            reserved_balance: "0",
+            opening_balance: "0"
+          }]
+        });
+      }
+      if (sql.includes("FROM ledger_entries")) {
+        return Promise.resolve({
+          rows: [
+            { fill_id: null, entry_type: "deposit", amount: "10000" },
+            { fill_id: fillRows[0]!.id, entry_type: "trade_debit", amount: "-1000" },
+            { fill_id: fillRows[0]!.id, entry_type: "fee", amount: "-1" },
+            { fill_id: fillRows[1]!.id, entry_type: "trade_debit", amount: "-800" },
+            { fill_id: fillRows[1]!.id, entry_type: "fee", amount: "-1" },
+            { fill_id: fillRows[2]!.id, entry_type: "trade_credit", amount: "1600" },
+            { fill_id: fillRows[2]!.id, entry_type: "fee", amount: "-1" },
+            { fill_id: null, entry_type: "reserve", amount: "-500" },
+            { fill_id: null, entry_type: "release", amount: "500" }
+          ]
+        });
+      }
+      if (sql.includes("FROM fills")) {
+        return Promise.resolve({ rows: fillRows });
+      }
+      return Promise.resolve({
+        rows: [{ symbol: "ALFA", quantity: "7", avg_cost: "120" }]
+      });
+    });
+
+    const response = await request(portfolioApp(query))
+      .get("/api/v1/portfolio/verify")
+      .set(authorization());
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ match: true, differences: [] });
+  });
 });

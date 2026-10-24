@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   AccountPortfolioResponseSchema,
   LedgerEntrySchema,
+  PortfolioVerifyResponseSchema,
   PaginatedLedgerResponseSchema,
   PortfolioPerformanceResponseSchema,
   TradeQuerySchema
@@ -17,11 +18,19 @@ import {
   calculatePortfolio,
   calculatePortfolioPerformance
 } from "../services/portfolio-calculations.js";
+import {
+  rebuildPortfolioFromLedger
+} from "../services/portfolio-replay.js";
+import type {
+  ReplayFill,
+  ReplayLedgerEntry
+} from "../services/portfolio-replay.js";
 
 interface AccountRow {
   id: string;
   cash_balance: string | number;
   reserved_balance: string | number;
+  opening_balance: string | number;
 }
 
 interface HoldingRow {
@@ -48,9 +57,31 @@ interface EquitySnapshotRow {
   equity_after: string | number;
 }
 
+interface RebuildLedgerRow {
+  fill_id: string | null;
+  entry_type: ReplayLedgerEntry["entryType"];
+  amount: string | number;
+}
+
+interface RebuildFillRow {
+  id: string;
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: string | number;
+  price: string | number;
+  executed_at: Date;
+  execution_sequence: string | number;
+}
+
+interface LivePositionRow {
+  symbol: string;
+  quantity: string | number;
+  avg_cost: string | number;
+}
+
 async function loadAccount(pool: Pool, userId: string): Promise<AccountRow> {
   const result = await pool.query<AccountRow>(
-    `SELECT id, cash_balance, reserved_balance
+    `SELECT id, cash_balance, reserved_balance, opening_balance
      FROM accounts WHERE user_id = $1`,
     [userId]
   );
@@ -189,6 +220,111 @@ export function createV1PortfolioRouter(pool: Pool, secret: string): Router {
     response.json(PaginatedLedgerResponseSchema.parse({
       entries,
       pagination: { limit, offset, total }
+    }));
+  });
+
+  router.get("/portfolio/verify", requireAuth, async (request, response) => {
+    const account = await loadAccount(pool, request.auth!.id);
+    const [ledgerResult, fillsResult, livePositionsResult] = await Promise.all([
+      pool.query<RebuildLedgerRow>(
+        `SELECT fill_id, entry_type, amount
+         FROM ledger_entries
+         WHERE account_id = $1
+         ORDER BY created_at ASC, id ASC`,
+        [account.id]
+      ),
+      pool.query<RebuildFillRow>(
+        `SELECT fill.id, instrument.symbol, own_order.side, fill.quantity, fill.price,
+                fill.executed_at, fill.execution_sequence
+         FROM fills AS fill
+         JOIN orders AS own_order ON own_order.id = fill.order_id
+         JOIN instruments AS instrument ON instrument.id = own_order.instrument_id
+         WHERE own_order.account_id = $1
+         UNION ALL
+         SELECT fill.id, instrument.symbol, counter_order.side, fill.quantity, fill.price,
+                fill.executed_at, fill.execution_sequence
+         FROM fills AS fill
+         JOIN orders AS counter_order ON counter_order.id = fill.counter_order_id
+         JOIN instruments AS instrument ON instrument.id = counter_order.instrument_id
+         WHERE counter_order.account_id = $1
+         ORDER BY executed_at ASC, id ASC`,
+        [account.id]
+      ),
+      pool.query<LivePositionRow>(
+        `SELECT instrument.symbol, position.quantity, position.avg_cost
+         FROM positions AS position
+         JOIN instruments AS instrument ON instrument.id = position.instrument_id
+         WHERE position.account_id = $1
+         ORDER BY instrument.symbol`,
+        [account.id]
+      )
+    ]);
+    const ledgerEntries: ReplayLedgerEntry[] = ledgerResult.rows.map((entry) => ({
+      fillId: entry.fill_id,
+      entryType: entry.entry_type,
+      amountPaise: databaseInteger(entry.amount, "ledger amount")
+    }));
+    const fills: ReplayFill[] = fillsResult.rows.map((fill) => ({
+      id: fill.id,
+      symbol: fill.symbol,
+      side: fill.side,
+      quantity: databaseInteger(fill.quantity, "fill quantity"),
+      pricePaise: databaseInteger(fill.price, "fill price"),
+      executedAt: fill.executed_at,
+      executionSequence: databaseInteger(fill.execution_sequence, "fill execution sequence")
+    }));
+    const rebuilt = rebuildPortfolioFromLedger(
+      ledgerEntries,
+      fills,
+      databaseInteger(account.opening_balance, "account opening balance")
+    );
+    const liveCash = databaseInteger(account.cash_balance, "cash balance");
+    const liveReserved = databaseInteger(account.reserved_balance, "reserved balance");
+    const liveHoldings = new Map(livePositionsResult.rows.map((position) => [
+      position.symbol,
+      {
+        quantity: databaseInteger(position.quantity, "position quantity"),
+        averageCostPaise: databaseInteger(position.avg_cost, "position average cost")
+      }
+    ]));
+    const rebuiltHoldings = new Map(rebuilt.holdings.map((position) => [position.symbol, position]));
+    const symbols = [...new Set([...liveHoldings.keys(), ...rebuiltHoldings.keys()])].sort();
+    const differences: Array<{ field: string; live: unknown; rebuilt: unknown }> = [];
+    if (liveCash !== rebuilt.cashBalancePaise) {
+      differences.push({
+        field: "cashBalancePaise",
+        live: liveCash,
+        rebuilt: rebuilt.cashBalancePaise
+      });
+    }
+    if (liveReserved !== rebuilt.reservedBalancePaise) {
+      differences.push({
+        field: "reservedBalancePaise",
+        live: liveReserved,
+        rebuilt: rebuilt.reservedBalancePaise
+      });
+    }
+    for (const symbol of symbols) {
+      const live = liveHoldings.get(symbol);
+      const reconstructed = rebuiltHoldings.get(symbol);
+      if (live?.quantity !== reconstructed?.quantity) {
+        differences.push({
+          field: `holdings.${symbol}.quantity`,
+          live: live?.quantity ?? 0,
+          rebuilt: reconstructed?.quantity ?? 0
+        });
+      }
+      if (live?.averageCostPaise !== reconstructed?.averageCostPaise) {
+        differences.push({
+          field: `holdings.${symbol}.averageCostPaise`,
+          live: live?.averageCostPaise ?? 0,
+          rebuilt: reconstructed?.averageCostPaise ?? 0
+        });
+      }
+    }
+    response.json(PortfolioVerifyResponseSchema.parse({
+      match: differences.length === 0,
+      differences
     }));
   });
 

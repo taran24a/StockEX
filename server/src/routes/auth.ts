@@ -124,6 +124,13 @@ export function createAuthRouter(pool: Pool, environment: Environment, objectSto
           "INSERT INTO wallets (user_id, balance_paise) VALUES ($1, $2)",
           [createdUser.id, 100_000_000]
         );
+        await client.query(
+          `INSERT INTO ledger_entries (account_id, entry_type, amount, balance_after)
+           SELECT account.id, 'deposit', account.cash_balance, account.cash_balance
+           FROM accounts AS account
+           WHERE account.user_id = $1`,
+          [createdUser.id]
+        );
         return createdUser;
       });
       response.status(201).json(authResponse(user, environment.JWT_SECRET));

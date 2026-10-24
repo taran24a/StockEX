@@ -43,6 +43,17 @@ try {
        ON CONFLICT (user_id) DO UPDATE SET balance_paise = GREATEST(wallets.balance_paise, EXCLUDED.balance_paise)`,
       [botUserId]
     );
+    await client.query(
+      `INSERT INTO ledger_entries (account_id, entry_type, amount, balance_after)
+       SELECT account.id, 'deposit', account.cash_balance, account.cash_balance
+       FROM accounts AS account
+       WHERE account.user_id = $1 AND account.opening_balance = 0
+         AND NOT EXISTS (
+           SELECT 1 FROM ledger_entries AS entry
+           WHERE entry.account_id = account.id AND entry.entry_type = 'deposit'
+         )`,
+      [botUserId]
+    );
     for (const instrument of marketInstruments) {
       await client.query(
         `INSERT INTO positions
@@ -74,6 +85,17 @@ try {
       await client.query(
         "INSERT INTO wallets (user_id, balance_paise) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING",
         [userId, 100_000_000]
+      );
+      await client.query(
+        `INSERT INTO ledger_entries (account_id, entry_type, amount, balance_after)
+         SELECT account.id, 'deposit', account.cash_balance, account.cash_balance
+         FROM accounts AS account
+         WHERE account.user_id = $1 AND account.opening_balance = 0
+           AND NOT EXISTS (
+             SELECT 1 FROM ledger_entries AS entry
+             WHERE entry.account_id = account.id AND entry.entry_type = 'deposit'
+           )`,
+        [userId]
       );
     }
   });

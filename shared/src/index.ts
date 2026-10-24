@@ -365,6 +365,49 @@ export const RiskAlertsResponseSchema = z.object({
   })
 });
 
+export const OrderTimelineEventSchema = z.object({
+  id: z.uuid(),
+  eventType: z.string().min(1),
+  sequenceNumber: z.number().int().positive().safe(),
+  message: z.string().min(1),
+  payload: z.record(z.string(), z.unknown()),
+  createdAt: z.iso.datetime()
+});
+
+export const OrderTimelineResponseSchema = z.object({
+  orderId: z.uuid(),
+  events: z.array(OrderTimelineEventSchema)
+});
+
+export const OrderReplayFrameSchema = z.object({
+  eventId: z.uuid(),
+  eventType: z.string().min(1),
+  message: z.string().min(1),
+  createdAt: z.iso.datetime(),
+  cashBalancePaise: paiseSchema,
+  holdings: z.array(z.object({
+    symbol: symbolSchema,
+    quantity: z.number().int().nonnegative().safe(),
+    averageCostPaise: paiseSchema
+  }))
+});
+
+export const OrderReplayResponseSchema = z.object({
+  orderId: z.uuid(),
+  frames: z.array(OrderReplayFrameSchema)
+});
+
+export const PortfolioDifferenceSchema = z.object({
+  field: z.string().min(1),
+  live: z.unknown(),
+  rebuilt: z.unknown()
+});
+
+export const PortfolioVerifyResponseSchema = z.object({
+  match: z.boolean(),
+  differences: z.array(PortfolioDifferenceSchema)
+});
+
 export const DomainEventSchema = z.object({
   id: z.uuid(),
   aggregateType: z.string().trim().min(1).max(64),
@@ -481,6 +524,11 @@ export type RiskRulesInput = z.infer<typeof RiskRulesInputSchema>;
 export type RiskSummary = z.infer<typeof RiskSummarySchema>;
 export type RiskAlert = z.infer<typeof RiskAlertSchema>;
 export type RiskAlertsResponse = z.infer<typeof RiskAlertsResponseSchema>;
+export type OrderTimelineEvent = z.infer<typeof OrderTimelineEventSchema>;
+export type OrderTimelineResponse = z.infer<typeof OrderTimelineResponseSchema>;
+export type OrderReplayFrame = z.infer<typeof OrderReplayFrameSchema>;
+export type OrderReplayResponse = z.infer<typeof OrderReplayResponseSchema>;
+export type PortfolioVerifyResponse = z.infer<typeof PortfolioVerifyResponseSchema>;
 export type DomainEvent = z.infer<typeof DomainEventSchema>;
 export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
 export type AvatarResponse = z.infer<typeof AvatarResponseSchema>;

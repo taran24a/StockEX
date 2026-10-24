@@ -102,8 +102,17 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         "/api/v1/portfolio/performance": {
           get: { summary: "Get portfolio profit and loss and equity history", responses: { "200": { description: "Portfolio performance" } } }
         },
+        "/api/v1/portfolio/verify": {
+          get: { summary: "Rebuild portfolio from the ledger and compare projections", responses: { "200": { description: "Portfolio verification" } } }
+        },
         "/api/v1/ledger": {
           get: { summary: "Get paginated account ledger entries", responses: { "200": { description: "Ledger entries" } } }
+        },
+        "/api/v1/orders/{id}/timeline": {
+          get: { summary: "Get the human-readable order event timeline", responses: { "200": { description: "Order timeline" } } }
+        },
+        "/api/v1/orders/{id}/replay": {
+          get: { summary: "Replay order events with account cash and holdings", responses: { "200": { description: "Order replay frames" } } }
         },
         "/api/v1/risk/rules": {
           get: { summary: "Get account risk rules", responses: { "200": { description: "Risk rules" } } },
