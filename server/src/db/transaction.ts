@@ -1,10 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import { logger } from "../logger.js";
 
-export async function withTransaction<T>(
-  pool: Pool,
-  operation: (client: PoolClient) => Promise<T>
-): Promise<T> {
+export async function withTransaction<T>(pool: Pool, operation: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
 
   try {

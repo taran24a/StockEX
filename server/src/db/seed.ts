@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { RegisterRequestSchema } from "@tradewise/shared";
-import { createDatabasePool } from "../db.js";
+import { createDatabasePool } from "./pool.js";
 import { withTransaction } from "./transaction.js";
 import { loadEnvironment } from "../config.js";
 

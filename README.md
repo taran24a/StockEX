@@ -14,7 +14,7 @@ Copy-Item .env.server.example .env
 Copy-Item .env.client.example client/.env
 docker compose up -d
 npm install
-npm run migrate
+npm run migrate:up
 ```
 
 ```powershell
@@ -23,9 +23,9 @@ npm run dev
 
 Open <http://localhost:5173>. The API listens on port 3000, the synthetic feed on 4000, PostgreSQL on 5432, and MinIO on 9000 (console: 9001). The API creates its upload bucket when it starts, so wait for MinIO to become ready first.
 
-The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scripts include `dev`, `build`, `test`, `lint`, `seed`, and `repl`. Set `SEED_EMAIL`, `SEED_DISPLAY_NAME`, and `SEED_PASSWORD` in `.env` before running `npm run seed`; the command creates one regular local account and preserves credentials if that email already exists.
+The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scripts include `dev`, `build`, `test`, `lint`, `seed`, `repl`, `migrate:up`, and `migrate:down`. Migration 002 adds accounts, instruments, candles, fills, ledger, events, risk, and watchlist tables while preserving existing API tables and data. `npm run migrate:down` rolls back one migration and drops its new trading-domain tables. Set `SEED_EMAIL`, `SEED_DISPLAY_NAME`, and `SEED_PASSWORD` in `.env` before running `npm run seed`; the command creates one regular local account and preserves credentials if that email already exists.
 
-New accounts receive **100,000,000 paise (₹1,000,000)** in virtual cash. Local credentials in `.env.example` are for development only; set a unique `JWT_SECRET` and service credentials before deployment. Keep `.env` out of version control.
+New accounts receive **100,000,000 paise (₹1,000,000)** in virtual cash. Local credentials in `.env.server.example` are for development only; set a unique `JWT_SECRET` and service credentials before deployment. Keep `.env` out of version control.
 
 ## Useful commands
 
@@ -35,6 +35,8 @@ npm test
 npm run build
 Invoke-RestMethod http://localhost:3000/api/v1/health
 ```
+
+Use `npm run migrate:up` to apply pending migrations and `npm run migrate:down` to revert the latest migration.
 
 Interactive API documentation is at <http://localhost:3000/api/docs>.
 

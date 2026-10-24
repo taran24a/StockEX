@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { createApp } from "./app.js";
 import { loadEnvironment } from "./config.js";
-import { createDatabasePool } from "./db.js";
+import { createDatabasePool } from "./db/pool.js";
 import { logger } from "./logger.js";
 import { attachQuoteStream } from "./market/quote-stream.js";
 import { createObjectStorage, ensureUploadBucket } from "./storage.js";
@@ -39,14 +39,17 @@ function shutdown(signal: NodeJS.Signals): void {
     if (error !== undefined) {
       logger.error({ err: error }, "HTTP server shutdown failed");
     }
-    void pool.end().then(() => {
-      if (error !== undefined) {
+    void pool
+      .end()
+      .then(() => {
+        if (error !== undefined) {
+          process.exitCode = 1;
+        }
+      })
+      .catch((poolError: unknown) => {
+        logger.error({ err: poolError }, "Database pool shutdown failed");
         process.exitCode = 1;
-      }
-    }).catch((poolError: unknown) => {
-      logger.error({ err: poolError }, "Database pool shutdown failed");
-      process.exitCode = 1;
-    });
+      });
   });
 }
 

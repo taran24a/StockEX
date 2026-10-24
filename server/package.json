@@ -12,6 +12,8 @@
     "pretest": "npm run build --workspace @tradewise/shared",
     "test": "vitest run src",
     "migrate": "node --import tsx src/db/migrate.ts",
+    "migrate:up": "node --import tsx src/db/migrate.ts up",
+    "migrate:down": "node --import tsx src/db/migrate.ts down",
     "seed": "node --import tsx src/db/seed.ts",
     "repl": "node --import tsx --experimental-repl-await"
   },
