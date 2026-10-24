@@ -1,13 +1,16 @@
 import express from "express";
+import * as Minio from "minio";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ErrorResponseSchema, HealthResponseSchema } from "@tradewise/shared";
-import { app } from "./app.js";
+import { app, createApp } from "./app.js";
+import { loadEnvironment } from "./config/index.js";
 import { NotFoundError } from "./services/errors.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { sanitizeRequest } from "./middleware/sanitize-request.js";
 import { validateBody, validateParams, validateQuery } from "./http-validation.js";
+import type { Pool } from "pg";
 
 const validationApp = express();
 validationApp.use(express.json());
@@ -46,6 +49,47 @@ describe("GET /api/v1/health", () => {
     expect(specification.text).toContain("openapi: 3.1.0");
     expect(specification.text).toContain("/api/v1/orders/{id}/timeline:");
     expect(specification.text).toContain("/api/admin/instruments/import:");
+  });
+
+  describe("GET /api/health/database", () => {
+    const environment = loadEnvironment({
+      DATABASE_URL: "postgres://test-user:test-password@localhost:5432/tradewise",
+      JWT_SECRET: "test-secret-that-is-long-enough-for-this-suite"
+    });
+    const objectStorage = new Minio.Client({
+      endPoint: environment.MINIO_ENDPOINT,
+      port: environment.MINIO_PORT,
+      useSSL: environment.MINIO_USE_SSL,
+      accessKey: environment.MINIO_ACCESS_KEY,
+      secretKey: environment.MINIO_SECRET_KEY
+    });
+
+    it("reports the connected database name without exposing credentials", async () => {
+      const pool = {
+        query: vi.fn().mockResolvedValue({ rows: [{ database: "tradewise" }] })
+      } as unknown as Pool;
+      const healthApp = createApp({ pool, environment, objectStorage });
+
+      const response = await request(healthApp).get("/api/health/database");
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ status: "ok", database: "tradewise" });
+      expect(JSON.stringify(response.body)).not.toContain("test-password");
+    });
+
+    it("reports a safe unavailable status when PostgreSQL cannot be reached", async () => {
+      const pool = {
+        query: vi.fn().mockRejectedValue(new Error("connection refused"))
+      } as unknown as Pool;
+      const healthApp = createApp({ pool, environment, objectStorage });
+
+      const response = await request(healthApp).get("/api/health/database");
+
+      expect(response.status).toBe(503);
+      expect(response.body).toEqual({ status: "error", database: "tradewise" });
+      expect(JSON.stringify(response.body)).not.toContain("connection refused");
+      expect(JSON.stringify(response.body)).not.toContain("test-password");
+    });
   });
 
   it("returns a response matching the shared health contract", async () => {

@@ -9,6 +9,11 @@ export const HealthResponseSchema = z.object({
   status: z.literal("ok")
 });
 
+export const DatabaseHealthResponseSchema = z.object({
+  status: z.enum(["ok", "error"]),
+  database: z.string().min(1)
+});
+
 export const RegisterRequestSchema = z.object({
   email: z.email().max(254),
   displayName: z.string().trim().min(2).max(60),

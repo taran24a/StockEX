@@ -150,7 +150,9 @@ describe("dashboard overview", () => {
     renderOverview();
 
     expect(screen.getByRole("status", { name: "Loading total equity" })).toBeTruthy();
-    expect(screen.getByText("Loading equity history…")).toBeTruthy();
+    expect(screen.getByRole("status", { name: "Loading equity history" })).toBeTruthy();
+    expect(screen.getAllByRole("status", { name: "Loading account data" })).toHaveLength(2);
+    expect(screen.getByRole("status", { name: "Loading watchlists" })).toBeTruthy();
     expect(screen.queryByText(/₹/)).toBeNull();
   });
 

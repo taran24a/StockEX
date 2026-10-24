@@ -2407,6 +2407,29 @@ html {
   line-height: 1.6;
 }
 
+.workspace-panel-skeleton {
+  display: grid;
+  gap: 0.72rem;
+  padding: 1rem 0;
+}
+
+.workspace-panel-skeleton > span:not(.sr-only) {
+  display: block;
+  width: 76%;
+  height: 0.7rem;
+  background: linear-gradient(90deg, #1a272d 20%, #26363a 45%, #1a272d 70%);
+  background-size: 220% 100%;
+  animation: workspace-shimmer 1.3s linear infinite;
+}
+
+.workspace-panel-skeleton > span:nth-child(3) {
+  width: 92%;
+}
+
+.workspace-panel-skeleton > span:nth-child(4) {
+  width: 58%;
+}
+
 .workspace-error {
   margin: 0.65rem 0;
   padding: 0.65rem 0.75rem;

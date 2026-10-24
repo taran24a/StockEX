@@ -1,7 +1,7 @@
 import express from "express";
 import { fileURLToPath } from "node:url";
 import cors from "cors";
-import { HealthResponseSchema } from "@tradewise/shared";
+import { DatabaseHealthResponseSchema, HealthResponseSchema } from "@tradewise/shared";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
@@ -23,6 +23,7 @@ import { createV1OrdersRouter } from "./routes/v1-orders.js";
 import { createV1PortfolioRouter } from "./routes/v1-portfolio.js";
 import { createRiskRouter } from "./routes/risk.js";
 import type { Client as MinioClient } from "minio";
+import { logger } from "./logger.js";
 
 export interface AppDependencies {
   pool: Pool;
@@ -88,6 +89,33 @@ export function createApp(dependencies?: AppDependencies): express.Express {
 
   if (dependencies !== undefined) {
     const { pool, environment, objectStorage } = dependencies;
+    const configuredDatabase = decodeURIComponent(new URL(environment.DATABASE_URL).pathname.slice(1));
+    app.get("/api/health/database", async (_request, response) => {
+      let result;
+      try {
+        result = await pool.query<{ database: string }>("SELECT current_database() AS database");
+      } catch (error) {
+        const code = typeof error === "object" && error !== null && "code" in error
+          ? String(error.code)
+          : "UNKNOWN";
+        logger.warn({ database: configuredDatabase, code }, "Database health check failed");
+        response.status(503).json(DatabaseHealthResponseSchema.parse({
+          status: "error",
+          database: configuredDatabase
+        }));
+        return;
+      }
+      const database = result.rows[0]?.database;
+      if (database === undefined) {
+        logger.warn({ database: configuredDatabase }, "Database health check returned no database name");
+        response.status(503).json(DatabaseHealthResponseSchema.parse({
+          status: "error",
+          database: configuredDatabase
+        }));
+        return;
+      }
+      response.json(DatabaseHealthResponseSchema.parse({ status: "ok", database }));
+    });
     app.use(
       ["/api/v1/auth", "/api/auth"],
       rateLimit({

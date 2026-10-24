@@ -40,7 +40,10 @@ npm run typecheck
 npm test
 npm run build
 Invoke-RestMethod http://localhost:3000/api/v1/health
+Invoke-RestMethod http://localhost:3000/api/health/database
 ```
+
+`/api/v1/health` is a liveness check. `/api/health/database` checks the PostgreSQL connection and returns only its status and database name; it returns HTTP 503 when the configured database is unavailable.
 
 Use `npm run migrate:up` to apply pending migrations and `npm run migrate:down` to revert the latest migration. Generate a 90-day CSV with `npm run candles:generate`; import it with `npm run candles:import -- C:\path\to\candles.csv`. The importer streams rows and can be rerun safely.
 

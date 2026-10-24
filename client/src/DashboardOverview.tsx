@@ -20,6 +20,17 @@ function ErrorState({ message }: { message: string }) {
   return <p className="workspace-error" role="alert">{message}</p>;
 }
 
+function PanelSkeleton({ label }: { label: string }) {
+  return (
+    <div aria-label={label} className="workspace-panel-skeleton" role="status">
+      <span className="sr-only">{label}…</span>
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
 function PanelState({
   loading,
   error,
@@ -34,7 +45,7 @@ function PanelState({
   children: ReactNode;
 }) {
   if (loading) {
-    return <p className="workspace-panel-state" role="status">Loading account data…</p>;
+    return <PanelSkeleton label="Loading account data" />;
   }
   if (error !== null) {
     return <ErrorState message={error.message} />;
@@ -162,10 +173,10 @@ function WatchlistPanel() {
         </div>
         <Link className="workspace-subtle-link" to="/app/markets">Markets</Link>
       </div>
-      {watchlists.isPending ? <p className="workspace-panel-state" role="status">Loading watchlists…</p> :
+      {watchlists.isPending ? <PanelSkeleton label="Loading watchlists" /> :
         watchlists.error instanceof Error ? <ErrorState message={watchlists.error.message} /> :
           watchlists.data?.watchlists.length === 0 ? <p className="workspace-panel-state">You haven’t created a watchlist yet. Visit Markets to explore live quotes.</p> :
-            quotes.isPending ? <p className="workspace-panel-state" role="status">Loading live quotes…</p> :
+            quotes.isPending ? <PanelSkeleton label="Loading live quotes" /> :
               quotes.error instanceof Error ? <ErrorState message={`Live quotes could not be loaded: ${quotes.error.message}`} /> :
                 items.length === 0 ? <p className="workspace-panel-state">Your watchlists don’t have any instruments yet.</p> : (
                   <ul className="workspace-watchlist">
@@ -270,7 +281,7 @@ function RiskPanel() {
         </div>
         <Link className="workspace-subtle-link" to="/app/risk">Risk details</Link>
       </div>
-      {risk.isPending ? <p className="workspace-panel-state" role="status">Loading risk summary…</p> :
+      {risk.isPending ? <PanelSkeleton label="Loading risk summary" /> :
         risk.error instanceof Error ? <ErrorState message={risk.error.message} /> :
           risk.data === undefined ? <p className="workspace-panel-state">Risk data is unavailable.</p> : (
             <>
@@ -360,7 +371,7 @@ export function DashboardOverview() {
           <p>A live split of account cash and the current market value of your holdings.</p>
         </div>
         {portfolio.isPending ? (
-          <p className="workspace-panel-state" role="status">Loading capital allocation…</p>
+          <PanelSkeleton label="Loading capital allocation" />
         ) : portfolioError !== null ? (
           <ErrorState message={portfolioError.message} />
         ) : portfolio.data === undefined ? (
@@ -406,7 +417,7 @@ export function DashboardOverview() {
           </div>
           {performance.data !== undefined && <p className="workspace-chart-current">Now <strong>{portfolio.data === undefined ? "—" : formatPaise(portfolio.data.totalEquityPaise)}</strong></p>}
         </div>
-        {performance.isPending ? <p className="workspace-panel-state" role="status">Loading equity history…</p> :
+        {performance.isPending ? <PanelSkeleton label="Loading equity history" /> :
           performanceError !== null ? <ErrorState message={performanceError.message} /> :
             curve.length === 0 ? <p className="workspace-panel-state">{chartSummary}</p> : (
               <>

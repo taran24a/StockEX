@@ -129,4 +129,50 @@ describe("auth routes", () => {
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe("INVALID_CREDENTIALS");
   });
+
+  it("logs in, serves the current profile, logs out, and protects authenticated routes", async () => {
+    const passwordHash = await bcrypt.hash("Correct@1234", 4);
+    const user: TestUser = {
+      id: userId,
+      email: "demo@tradewise.dev",
+      display_name: "Demo",
+      role: "user",
+      password_hash: passwordHash
+    };
+    const pool = createPool(async (query) => ({
+      rows: [query.includes("password_hash") ? user : {
+        id: user.id,
+        email: user.email,
+        display_name: user.display_name,
+        role: user.role,
+        avatar_object_key: null
+      }]
+    }));
+    const app = createApp(pool);
+    const login = await request(app)
+      .post("/api/v1/auth/login")
+      .send({ email: user.email, password: "Correct@1234" });
+
+    expect(login.status).toBe(200);
+    expect(login.body.token).toEqual(expect.any(String));
+
+    const currentUser = await request(app)
+      .get("/api/v1/auth/me")
+      .set("Authorization", `Bearer ${login.body.token}`);
+    expect(currentUser.status).toBe(200);
+    expect(currentUser.body.user).toEqual({
+      id: user.id,
+      email: user.email,
+      displayName: user.display_name,
+      role: user.role
+    });
+
+    const logout = await request(app)
+      .post("/api/v1/auth/logout")
+      .set("Authorization", `Bearer ${login.body.token}`);
+    expect(logout.status).toBe(204);
+
+    const protectedProfile = await request(app).get("/api/v1/auth/me");
+    expect(protectedProfile.status).toBe(401);
+  });
 });
