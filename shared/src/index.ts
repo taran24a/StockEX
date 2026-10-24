@@ -592,7 +592,7 @@ export const ResetVirtualAccountResponseSchema = z.object({
 });
 
 export const ResetVirtualAccountRequestSchema = z.object({
-  confirm: z.literal(true)
+  confirm: z.literal("RESET")
 });
 
 export const VirtualResetCooldownSchema = z.object({

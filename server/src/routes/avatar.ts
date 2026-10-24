@@ -197,7 +197,6 @@ export function createAvatarRouter(
 
   router.post("/me/reset", requireAuth, validateBody(ResetVirtualAccountRequestSchema), async (request, response) => {
     const input = validatedBody<ResetVirtualAccountRequest>(response);
-    ResetVirtualAccountRequestSchema.parse(input);
     const userId = request.auth!.id;
     const result = await withTransaction(pool, async (client) => {
       const accountResult = await client.query<ResetAccountRow>(
@@ -283,7 +282,7 @@ export function createAvatarRouter(
         "UPDATE wallets SET balance_paise = $1, updated_at = now() WHERE user_id = $2",
         [startingVirtualCashPaise, account.user_id]
       );
-      const updatedAccount = await client.query(
+      const updatedAccount = await client.query<{ last_virtual_reset_at: Date }>(
         `UPDATE accounts
          SET cash_balance = $2, reserved_balance = 0, last_virtual_reset_at = clock_timestamp(),
              version = version + 1, updated_at = now()
@@ -291,7 +290,7 @@ export function createAvatarRouter(
          RETURNING last_virtual_reset_at`,
         [account.id, startingVirtualCashPaise]
       );
-      const lastResetAt = updatedAccount.rows[0]?.last_virtual_reset_at as Date | undefined;
+      const lastResetAt = updatedAccount.rows[0]?.last_virtual_reset_at;
       if (lastResetAt === undefined) {
         throw new Error("Virtual account reset timestamp was not returned");
       }

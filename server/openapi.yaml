@@ -144,6 +144,93 @@ paths:
         "201": {description: Avatar uploaded; contains a presigned URL}
         "413": {description: File exceeds 2 MB}
         "415": {description: Unsupported type or invalid image contents}
+  /api/v1/users/me:
+    get:
+      tags: [Authentication]
+      summary: Get profile, account creation date, and reset eligibility
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Profile and virtual-account reset cooldown}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+    patch:
+      tags: [Authentication]
+      summary: Update the current user's display name
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [displayName]
+              properties:
+                displayName: {type: string, minLength: 2, maxLength: 60}
+      responses:
+        "200": {description: Updated user profile}
+        "400": {$ref: "#/components/responses/BadRequest"}
+  /api/v1/users/me/password:
+    patch:
+      tags: [Authentication]
+      summary: Change the current user's password
+      description: Requires the current password; the new password is stored as a bcrypt hash.
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: {type: string, minLength: 12}
+                newPassword: {type: string, minLength: 12, maxLength: 128}
+      responses:
+        "204": {description: Password changed}
+        "400": {description: Current password is incorrect or input is invalid}
+  /api/v1/users/me/reset:
+    post:
+      tags: [Authentication]
+      summary: Reset the authenticated user's virtual trading account
+      description: Cancels open orders, clears current positions, restores starting virtual cash, and retains historical orders, fills, and ledger entries.
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirm]
+              properties:
+                confirm: {type: string, enum: [RESET]}
+      responses:
+        "200": {description: Account reset and next eligible reset time}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {description: Reset cooldown is active}
+  /api/admin/settings/virtual-account-reset-cooldown:
+    get:
+      tags: [Administration]
+      summary: Get the global virtual-account reset cooldown
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Cooldown hours and last update time}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    put:
+      tags: [Administration]
+      summary: Update the global virtual-account reset cooldown
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cooldownHours]
+              properties:
+                cooldownHours: {type: integer, minimum: 1, maximum: 8760}
+      responses:
+        "200": {description: Updated cooldown}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "403": {$ref: "#/components/responses/Forbidden"}
   /api/market/quotes:
     get:
       tags: [Market]

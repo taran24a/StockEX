@@ -48,6 +48,7 @@ beforeEach(() => {
   apiRequestMock.mockImplementation((path: string, _schema: unknown, _token: string | undefined, init?: RequestInit) => {
     if (path === "/api/v1/users/me" && init?.method === "PATCH") return Promise.resolve({ ...user, displayName: "New Trader" });
     if (path === "/api/v1/users/me") return Promise.resolve(profile);
+    if (path === "/api/v1/users/me/password" && init?.method === "PATCH") return Promise.resolve(undefined);
     if (path === "/api/v1/users/me/reset") return Promise.resolve({
       cashBalancePaise: 100_000_000,
       cancelledOrders: 1,
@@ -98,23 +99,30 @@ describe("profile workspace", () => {
   });
 
   it("requires matching password confirmation and sends the authenticated password request", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
-    vi.stubGlobal("fetch", fetchMock);
     renderProfile();
     fireEvent.change(screen.getByLabelText("Current password"), { target: { value: "CurrentPassword123" } });
     fireEvent.change(screen.getByLabelText("New password"), { target: { value: "NewPassword12345" } });
     fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "DoesNotMatch123" } });
     fireEvent.click(screen.getByRole("button", { name: "Change password" }));
     expect(screen.getByRole("alert").textContent).toContain("New password and confirmation do not match.");
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(apiRequestMock).not.toHaveBeenCalledWith(
+      "/api/v1/users/me/password",
+      expect.anything(),
+      expect.anything(),
+      expect.anything()
+    );
 
     fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "NewPassword12345" } });
     fireEvent.click(screen.getByRole("button", { name: "Change password" }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/v1/users/me/password", expect.objectContaining({
-      method: "PATCH",
-      headers: expect.objectContaining({ Authorization: "Bearer signed-token" }),
-      body: JSON.stringify({ currentPassword: "CurrentPassword123", newPassword: "NewPassword12345" })
-    })));
+    await waitFor(() => expect(apiRequestMock).toHaveBeenCalledWith(
+      "/api/v1/users/me/password",
+      expect.anything(),
+      "signed-token",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ currentPassword: "CurrentPassword123", newPassword: "NewPassword12345" })
+      })
+    ));
     expect(await screen.findByText("Password changed successfully.")).toBeTruthy();
   });
 
@@ -130,7 +138,7 @@ describe("profile workspace", () => {
       "/api/v1/users/me/reset",
       expect.anything(),
       "signed-token",
-      { method: "POST", body: JSON.stringify({ confirm: true }) }
+      { method: "POST", body: JSON.stringify({ confirm: "RESET" }) }
     ));
     expect(await screen.findByText(/1 open orders cancelled, 2 positions cleared/)).toBeTruthy();
   });

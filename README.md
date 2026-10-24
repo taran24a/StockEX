@@ -56,7 +56,8 @@ The Bruno collection is in [bruno/TradeWise](./bruno/TradeWise). Open it in Brun
 
 - `GET /api/v1/health`
 - `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`
-- `POST /api/v1/auth/me/avatar` (JPEG, PNG, or WebP; 2 MB maximum; stored in MinIO)
+- `POST /api/v1/auth/me/avatar` (JPEG, PNG, or WebP; 2 MB maximum; stored in S3-compatible object storage)
+- `GET/PATCH /api/v1/users/me`, `PATCH /api/v1/users/me/password`, `POST /api/v1/users/me/reset`, and `POST /api/v1/users/me/avatar`
 - `GET /api/quotes` and `GET /api/quotes/ws`
 - `GET /api/market/quotes`, `GET /api/market/instruments`, `GET /api/market/:symbol`, `GET /api/market/:symbol/candles`, `GET /api/market/:symbol/depth`
 - Authenticated watchlist CRUD at `/api/watchlists`, including instrument add/remove routes
@@ -68,6 +69,7 @@ The protected `/app/markets` workspace provides searchable, sector-filtered inst
 The protected `/app/orders` workspace supports URL-backed status, side, symbol, and date filters, paginated order history, open-order cancellation, event timelines, and step-by-step cash/holdings replay. Authenticated order WebSocket updates refresh the visible order list.
 The protected `/app/portfolio` workspace shows holdings and per-position P&L, stock and sector allocation, performance contributions, paginated ledger activity, a downloadable CSV statement, and ledger-replay verification.
 The protected `/app/risk` workspace edits account trading limits, displays concentration gauges and read/unread risk alerts, and previews hypothetical buy/sell concentration through `POST /api/v1/risk/preview` without placing an order.
+The protected `/app/profile` workspace edits the display name, uploads a validated avatar, changes the password, and shows account details. It also provides a typed-confirmation reset for the virtual account; reset cancels open orders, clears positions, restores ₹10,00,000 virtual cash, and retains historical trading and ledger records. Administrators can configure the global reset cooldown (initially 24 hours). Migration `009_virtual_account_reset` must be applied before using the profile/reset endpoints.
 
 Administrators also see a read-only user directory in the dashboard, backed by this endpoint.
 

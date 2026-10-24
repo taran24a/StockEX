@@ -58,6 +58,7 @@ function AvatarEditor({
     setUploading(true);
     try {
       await uploadAvatar(file);
+      setPreviewUrl(null);
       setMessage("Avatar updated.");
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Avatar could not be uploaded.");
@@ -251,7 +252,7 @@ export function ProfilePage() {
   });
   const reset = useMutation({
     mutationFn: () => {
-      const input = ResetVirtualAccountRequestSchema.parse({ confirm: true });
+      const input = ResetVirtualAccountRequestSchema.parse({ confirm: "RESET" });
       return apiRequest("/api/v1/users/me/reset", ResetVirtualAccountResponseSchema, token ?? undefined, {
         method: "POST",
         body: JSON.stringify(input)

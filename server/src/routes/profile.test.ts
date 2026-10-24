@@ -78,9 +78,12 @@ describe("profile routes", () => {
 
   it("changes the password only after verifying the existing bcrypt hash", async () => {
     const passwordHash = await bcrypt.hash("CorrectCurrent123", 4);
-    const query = vi.fn()
-      .mockResolvedValueOnce({ rows: [{ password_hash: passwordHash }] })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    const query = vi.fn((sql: string) => {
+      if (sql === "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE") {
+        return Promise.resolve({ rows: [{ password_hash: passwordHash }] });
+      }
+      return Promise.resolve({ rows: [], rowCount: 1 });
+    });
 
     const response = await request(profileApp(query))
       .patch("/api/v1/users/me/password")
@@ -88,7 +91,7 @@ describe("profile routes", () => {
       .send({ currentPassword: "CorrectCurrent123", newPassword: "NewCorrectPassword123" });
 
     expect(response.status).toBe(204);
-    const savedHash = query.mock.calls[1]?.[1]?.[0];
+    const savedHash = query.mock.calls.find(([sql]) => String(sql).includes("UPDATE users SET password_hash"))?.[1]?.[0];
     expect(typeof savedHash).toBe("string");
     expect(await bcrypt.compare("NewCorrectPassword123", String(savedHash))).toBe(true);
     expect(String(savedHash)).not.toBe("NewCorrectPassword123");
@@ -96,7 +99,9 @@ describe("profile routes", () => {
 
   it("rejects an incorrect current password without changing the stored hash", async () => {
     const passwordHash = await bcrypt.hash("CorrectCurrent123", 4);
-    const query = vi.fn().mockResolvedValueOnce({ rows: [{ password_hash: passwordHash }] });
+    const query = vi.fn((sql: string) => sql === "SELECT password_hash FROM users WHERE id = $1 FOR UPDATE"
+      ? Promise.resolve({ rows: [{ password_hash: passwordHash }] })
+      : Promise.resolve({ rows: [], rowCount: 0 }));
 
     const response = await request(profileApp(query))
       .patch("/api/v1/users/me/password")
@@ -105,7 +110,7 @@ describe("profile routes", () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("CURRENT_PASSWORD_INCORRECT");
-    expect(query).toHaveBeenCalledOnce();
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("UPDATE users SET password_hash"))).toBe(false);
   });
 
   it("resets only the authenticated account and records an auditable reset ledger entry", async () => {
@@ -135,7 +140,7 @@ describe("profile routes", () => {
     const response = await request(profileApp(query))
       .post("/api/v1/users/me/reset")
       .set(authorization())
-      .send({ confirm: true });
+      .send({ confirm: "RESET" });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
@@ -147,5 +152,33 @@ describe("profile routes", () => {
     expect(query.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO ledger_entries") && String(sql).includes("'virtual_reset'"))).toBe(true);
     expect(query.mock.calls.some(([sql]) => String(sql).includes("DELETE FROM positions WHERE account_id = $1"))).toBe(true);
     expect(query.mock.calls.some(([sql]) => String(sql).includes("UPDATE orders") && String(sql).includes("'ACCOUNT_RESET'"))).toBe(true);
+  });
+
+  it("enforces the configured reset cooldown before changing the account", async () => {
+    const query = vi.fn((sql: string) => {
+      if (sql === "BEGIN" || sql === "COMMIT" || sql === "ROLLBACK") return Promise.resolve({ rows: [] });
+      if (sql.includes("FROM accounts WHERE user_id")) return Promise.resolve({
+        rows: [{
+          id: accountId,
+          user_id: userId,
+          cash_balance: "100000000",
+          reserved_balance: "0",
+          opening_balance: "0",
+          last_virtual_reset_at: new Date(Date.now() - 1000)
+        }]
+      });
+      if (sql.includes("FROM system_settings")) return Promise.resolve({ rows: [{ value: 24 }] });
+      return Promise.resolve({ rows: [], rowCount: 0 });
+    });
+
+    const response = await request(profileApp(query))
+      .post("/api/v1/users/me/reset")
+      .set(authorization())
+      .send({ confirm: "RESET" });
+
+    expect(response.status).toBe(429);
+    expect(response.body.error.code).toBe("RESET_COOLDOWN_ACTIVE");
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("DELETE FROM positions"))).toBe(false);
+    expect(query.mock.calls.some(([sql]) => String(sql).includes("UPDATE accounts"))).toBe(false);
   });
 });
