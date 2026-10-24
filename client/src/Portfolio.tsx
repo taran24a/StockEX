@@ -8,7 +8,7 @@ import {
   type LedgerEntry,
   type RiskSummary
 } from "@tradewise/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { apiRequest } from "./api";
@@ -179,7 +179,6 @@ function LedgerSection() {
 
 export function PortfolioPage() {
   const { token } = useAuth();
-  const queryClient = useQueryClient();
   const portfolio = useQuery({
     queryKey: ["portfolio"],
     queryFn: () => apiRequest("/api/v1/portfolio", AccountPortfolioResponseSchema, token ?? undefined),
@@ -199,10 +198,7 @@ export function PortfolioPage() {
     refetchInterval: 30_000
   });
   const verify = useMutation({
-    mutationFn: () => apiRequest("/api/v1/portfolio/verify", PortfolioVerifyResponseSchema, token ?? undefined),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["portfolio"] });
-    }
+    mutationFn: () => apiRequest("/api/v1/portfolio/verify", PortfolioVerifyResponseSchema, token ?? undefined)
   });
   const download = useMutation({
     mutationFn: async () => {
