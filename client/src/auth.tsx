@@ -10,6 +10,7 @@ import {
 } from "@tradewise/shared";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiClientError, apiRequest } from "./api";
+import { AUTH_EXPIRED_EVENT, SESSION_TOKEN_KEY } from "./api/client";
 
 interface AuthContextValue {
   token: string | null;
@@ -24,7 +25,6 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const SESSION_TOKEN_KEY = "tradewise.session-token";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => sessionStorage.getItem(SESSION_TOKEN_KEY));
@@ -32,6 +32,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    function handleSessionExpired(): void {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+      setToken(null);
+      setUser(null);
+      setAvatarUrl(null);
+      setError(null);
+      setReady(true);
+    }
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleSessionExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleSessionExpired);
+  }, []);
 
   useEffect(() => {
     if (token === null) {

@@ -5,14 +5,22 @@ import {
   type RegisterRequest
 } from "@tradewise/shared";
 import { useState, type FormEvent } from "react";
+import { Button, Input } from "./components/ui";
 
 interface AuthFormProps {
   onLogin(input: LoginRequest): Promise<void>;
   onRegister(input: RegisterRequest): Promise<void>;
+  initialMode?: "login" | "register";
+  showModeToggle?: boolean;
 }
 
-export function AuthForm({ onLogin, onRegister }: AuthFormProps) {
-  const [mode, setMode] = useState<"login" | "register">("login");
+export function AuthForm({
+  onLogin,
+  onRegister,
+  initialMode = "login",
+  showModeToggle = true
+}: AuthFormProps) {
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -54,54 +62,43 @@ export function AuthForm({ onLogin, onRegister }: AuthFormProps) {
   return (
     <form className="space-y-4" onSubmit={submit}>
       {mode === "register" && (
-        <label className="block text-sm text-slate-300">
-          Display name
-          <input
-            autoComplete="name"
-            className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
-            onChange={(event) => setDisplayName(event.target.value)}
-            value={displayName}
-          />
-        </label>
+        <Input
+          autoComplete="name"
+          label="Display name"
+          onChange={(event) => setDisplayName(event.target.value)}
+          value={displayName}
+        />
       )}
-      <label className="block text-sm text-slate-300">
-        Email
-        <input
-          autoComplete="email"
-          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
-          onChange={(event) => setEmail(event.target.value)}
-          type="email"
-          value={email}
-        />
-      </label>
-      <label className="block text-sm text-slate-300">
-        Password
-        <input
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-white"
-          onChange={(event) => setPassword(event.target.value)}
-          type="password"
-          value={password}
-        />
-      </label>
+      <Input
+        autoComplete="email"
+        label="Email"
+        onChange={(event) => setEmail(event.target.value)}
+        type="email"
+        value={email}
+      />
+      <Input
+        autoComplete={mode === "login" ? "current-password" : "new-password"}
+        label="Password"
+        onChange={(event) => setPassword(event.target.value)}
+        type="password"
+        value={password}
+      />
       {mode === "register" && (
         <p className="text-xs text-slate-500">Use at least 12 characters for your password.</p>
       )}
       {error !== null && <p className="text-sm text-rose-400" role="alert">{error}</p>}
-      <button
-        className="w-full rounded-lg bg-emerald-400 px-4 py-2.5 font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:opacity-50"
+      <Button
+        className="w-full"
         disabled={submitting}
         type="submit"
       >
         {submitting ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-      </button>
-      <button
-        className="w-full text-sm text-slate-400 hover:text-white"
-        onClick={toggleMode}
-        type="button"
-      >
-        {mode === "login" ? "New to TradeWise? Create an account" : "Already have an account? Sign in"}
-      </button>
+      </Button>
+      {showModeToggle && (
+        <Button className="w-full" onClick={toggleMode} variant="ghost">
+          {mode === "login" ? "New to TradeWise? Create an account" : "Already have an account? Sign in"}
+        </Button>
+      )}
     </form>
   );
 }

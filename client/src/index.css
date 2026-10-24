@@ -1,13 +1,25 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
+  --color-fintech-background: #020617;
+  --color-fintech-surface: #0f172a;
+  --color-fintech-gain: #34d399;
+  --color-fintech-loss: #fb7185;
+  --color-fintech-indigo: #818cf8;
+  --color-fintech-cyan: #22d3ee;
+}
+
 /* SYLLABUS: Tailwind */
 
 html {
   color-scheme: dark;
+  background: #020617;
 }
 
 body {
   margin: 0;
   min-width: 320px;
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter Variable", Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #e2e8f0;
 }
