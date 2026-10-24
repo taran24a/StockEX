@@ -11,6 +11,7 @@ import { Spinner } from "./components/ui";
 
 const MarketsPage = lazy(() => import("./Markets").then((module) => ({ default: module.MarketsPage })));
 const MarketDetailPage = lazy(() => import("./Markets").then((module) => ({ default: module.MarketDetailPage })));
+const OrdersPage = lazy(() => import("./Orders").then((module) => ({ default: module.OrdersPage })));
 
 const navigation = [
   { label: "Dashboard", path: "/app/dashboard", mark: "D" },
@@ -362,7 +363,7 @@ export function WorkspaceLayout() {
               <Route element={<DashboardOverview />} path="dashboard" />
               <Route element={<MarketsPage />} path="markets" />
               <Route element={<MarketDetailPage />} path="markets/:symbol" />
-              <Route element={<WorkspaceStub detail="Your recent orders are available on the dashboard while a dedicated order manager is being built." title="Orders" />} path="orders" />
+              <Route element={<OrdersPage />} path="orders" />
               <Route element={<WorkspaceStub detail="Your live holdings are shown on the dashboard. A full portfolio workspace is not available yet." title="Portfolio" />} path="portfolio" />
               <Route element={<WorkspaceStub detail="Risk warnings and concentration are summarized on the dashboard. Dedicated risk controls are not available yet." title="Risk" />} path="risk" />
               <Route element={<ProfileStub />} path="profile" />
