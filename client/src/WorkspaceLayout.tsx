@@ -13,6 +13,7 @@ const MarketsPage = lazy(() => import("./Markets").then((module) => ({ default: 
 const MarketDetailPage = lazy(() => import("./Markets").then((module) => ({ default: module.MarketDetailPage })));
 const OrdersPage = lazy(() => import("./Orders").then((module) => ({ default: module.OrdersPage })));
 const PortfolioPage = lazy(() => import("./Portfolio").then((module) => ({ default: module.PortfolioPage })));
+const RiskPage = lazy(() => import("./Risk").then((module) => ({ default: module.RiskPage })));
 
 const navigation = [
   { label: "Dashboard", path: "/app/dashboard", mark: "D" },
@@ -366,7 +367,7 @@ export function WorkspaceLayout() {
               <Route element={<MarketDetailPage />} path="markets/:symbol" />
               <Route element={<OrdersPage />} path="orders" />
               <Route element={<PortfolioPage />} path="portfolio" />
-              <Route element={<WorkspaceStub detail="Risk warnings and concentration are summarized on the dashboard. Dedicated risk controls are not available yet." title="Risk" />} path="risk" />
+              <Route element={<RiskPage />} path="risk" />
               <Route element={<ProfileStub />} path="profile" />
               <Route element={<WorkspaceStub detail="This workspace route is not implemented yet." title="Page not found" />} path="*" />
             </Routes>

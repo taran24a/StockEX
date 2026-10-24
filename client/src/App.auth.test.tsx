@@ -41,6 +41,12 @@ vi.mock("./Portfolio", () => ({
     return <div>{`${location.pathname}${location.search}${location.hash}`}</div>;
   }
 }));
+vi.mock("./Risk", () => ({
+  RiskPage: () => {
+    const location = useLocation();
+    return <div>{`${location.pathname}${location.search}${location.hash}`}</div>;
+  }
+}));
 vi.mock("./hooks/useQuotesSocket", () => ({
   useQuotesSocket: () => ({ status: "disconnected", recentOrderEvents: [], error: null })
 }));
