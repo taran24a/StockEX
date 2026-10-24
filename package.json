@@ -1,6 +1,7 @@
 {
   "name": "tradewise",
   "private": true,
+  "type": "module",
   "workspaces": [
     "shared",
     "server",
@@ -10,9 +11,13 @@
     "node": ">=20.19"
   },
   "scripts": {
+    "dev": "npm run build --workspace @tradewise/shared && concurrently -k -n API,WEB \"npm run dev --workspace @tradewise/server\" \"npm run dev --workspace @tradewise/client\"",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "lint": "eslint .",
+    "seed": "npm run migrate && npm run seed --workspace @tradewise/server",
+    "repl": "npm run repl --workspace @tradewise/server",
     "pretypecheck": "npm run build --workspace @tradewise/shared",
     "pretest": "npm run build --workspace @tradewise/shared",
     "dev:server": "npm run build --workspace @tradewise/shared && npm run dev --workspace @tradewise/server",
@@ -21,6 +26,11 @@
     "migrate": "npm run build --workspace @tradewise/shared && npm run migrate --workspace @tradewise/server"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "@eslint/js": "^9.39.5",
+    "concurrently": "^9.2.5",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.10",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.0"
   }
 }

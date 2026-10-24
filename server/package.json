@@ -11,7 +11,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build --workspace @tradewise/shared",
     "test": "vitest run src",
-    "migrate": "node --import tsx src/db/migrate.ts"
+    "migrate": "node --import tsx src/db/migrate.ts",
+    "seed": "node --import tsx src/db/seed.ts",
+    "repl": "node --import tsx --experimental-repl-await"
   },
   "dependencies": {
     "@tradewise/shared": "1.0.0",

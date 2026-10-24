@@ -4,4 +4,9 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.server.example
+!.env.client.example
+coverage/
+.eslintcache
+.prettier-cache
 coverage/

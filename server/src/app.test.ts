@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { ErrorResponseSchema, HealthResponseSchema } from "@tradewise/shared";
 import { app } from "./app.js";
 
-describe("GET /health", () => {
+describe("GET /api/v1/health", () => {
   it("returns a response matching the shared health contract", async () => {
     // SYLLABUS: Postman-alternative testing
-    const response = await request(app).get("/api/health");
+    const response = await request(app).get("/api/v1/health");
 
     expect(response.status).toBe(200);
     expect(HealthResponseSchema.parse(response.body)).toEqual({ status: "ok" });
@@ -20,10 +20,7 @@ describe("GET /health", () => {
   });
 
   it("rejects malformed JSON with a client error", async () => {
-    const response = await request(app)
-      .post("/api/not-a-route")
-      .set("Content-Type", "application/json")
-      .send("{");
+    const response = await request(app).post("/api/not-a-route").set("Content-Type", "application/json").send("{");
 
     expect(response.status).toBe(400);
     expect(ErrorResponseSchema.parse(response.body).error.code).toBe("INVALID_JSON");
