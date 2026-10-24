@@ -7,10 +7,11 @@ import { AuthProvider, useAuth } from "./auth";
 import { ProtectedRoute } from "./components/routes/ProtectedRoute";
 import { RoleRoute } from "./components/routes/RoleRoute";
 import { Card, ErrorBoundary, Spinner } from "./components/ui";
+import { LandingPage } from "./LandingPage";
 
 const Dashboard = lazy(() => import("./Dashboard").then((module) => ({ default: module.Dashboard })));
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, staleTime: 1_000 }
   }
@@ -24,17 +25,17 @@ function AuthPage({ mode }: { mode: "login" | "register" }) {
     return <div className="grid min-h-screen place-items-center"><Spinner label="Checking session" /></div>;
   }
   if (user !== null) {
-    return <Navigate to={user.role === "admin" ? "/admin" : "/app"} replace />;
+    return <Navigate to={user.role === "admin" ? "/admin" : "/app/dashboard"} replace />;
   }
 
   async function handleLogin(input: LoginRequest): Promise<void> {
     await signIn(input);
-    navigate("/app", { replace: true });
+    navigate("/app/dashboard", { replace: true });
   }
 
   async function handleRegister(input: RegisterRequest): Promise<void> {
     await register(input);
-    navigate("/app", { replace: true });
+    navigate("/app/dashboard", { replace: true });
   }
 
   return (
@@ -59,14 +60,6 @@ function AuthPage({ mode }: { mode: "login" | "register" }) {
   );
 }
 
-function RootRedirect() {
-  const { user, ready } = useAuth();
-  if (!ready) {
-    return <div className="grid min-h-screen place-items-center"><Spinner label="Loading TradeWise" /></div>;
-  }
-  return <Navigate to={user === null ? "/login" : user.role === "admin" ? "/admin" : "/app"} replace />;
-}
-
 function AppStub() {
   return (
     <Suspense fallback={<div className="grid min-h-screen place-items-center"><Spinner label="Loading workspace" /></div>}>
@@ -82,7 +75,7 @@ function AdminStub() {
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Administrator</p>
         <h1 className="mt-2 text-2xl font-semibold">Admin workspace</h1>
         <p className="mt-2 text-sm text-slate-400">This route is ready for the admin workspace pages.</p>
-        <Link className="mt-5 inline-block text-sm font-medium text-cyan-300 hover:text-cyan-200" to="/app">
+        <Link className="mt-5 inline-block text-sm font-medium text-cyan-300 hover:text-cyan-200" to="/app/dashboard">
           Go to trading app
         </Link>
       </Card>
@@ -93,7 +86,7 @@ function AdminStub() {
 function ApplicationRoutes() {
   return (
     <Routes>
-      <Route element={<RootRedirect />} path="/" />
+      <Route element={<LandingPage />} path="/" />
       <Route element={<AuthPage mode="login" />} path="/login" />
       <Route element={<AuthPage mode="register" />} path="/register" />
       <Route

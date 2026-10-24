@@ -13,7 +13,7 @@ export function RoleRoute({ children, role }: { children: ReactNode; role: "admi
     return <Navigate to="/login" replace />;
   }
   if (user.role !== role) {
-    return <Navigate to="/app" replace />;
+    return <Navigate to="/app/dashboard" replace />;
   }
   return children;
 }

@@ -13,7 +13,13 @@ export interface PricePoint {
   value: number;
 }
 
-export function LivePriceChart({ data }: { data: PricePoint[] }) {
+export function LivePriceChart({
+  data,
+  ariaLabel = "Live price chart"
+}: {
+  data: PricePoint[];
+  ariaLabel?: string;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
@@ -64,5 +70,5 @@ export function LivePriceChart({ data }: { data: PricePoint[] }) {
     chartRef.current?.timeScale().fitContent();
   }, [data]);
 
-  return <div aria-label="Live price chart" className="h-60 w-full" ref={containerRef} />;
+  return <div aria-label={ariaLabel} className="h-60 w-full" ref={containerRef} role="img" />;
 }
