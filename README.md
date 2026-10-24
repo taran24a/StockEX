@@ -58,11 +58,13 @@ The Bruno collection is in [bruno/TradeWise](./bruno/TradeWise). Open it in Brun
 - `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`
 - `POST /api/v1/auth/me/avatar` (JPEG, PNG, or WebP; 2 MB maximum; stored in MinIO)
 - `GET /api/quotes` and `GET /api/quotes/ws`
-- `GET /api/market/quotes`, `GET /api/market/:symbol`, `GET /api/market/:symbol/candles`
+- `GET /api/market/quotes`, `GET /api/market/instruments`, `GET /api/market/:symbol`, `GET /api/market/:symbol/candles`, `GET /api/market/:symbol/depth`
 - Authenticated watchlist CRUD at `/api/watchlists`, including instrument add/remove routes
 - `GET /api/wallet`, `GET /api/portfolio`
 - `POST /api/orders`, `GET /api/orders`, `GET /api/trades`
 - `GET /api/admin/users` (admin role only)
+
+The protected `/app/markets` workspace provides searchable, sector-filtered instruments, live quotes, watchlist actions, candlestick intervals, aggregated open-order depth, and risk-checked market/limit order tickets.
 
 Administrators also see a read-only user directory in the dashboard, backed by this endpoint.
 

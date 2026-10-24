@@ -143,6 +143,9 @@ describe("markets workspace", () => {
 
     fireEvent.keyDown(document, { key: "s" });
     expect(screen.getByRole("button", { name: "SELL", pressed: true })).toBeTruthy();
+    fireEvent.keyDown(document, { key: "b" });
+    expect(screen.getByRole("button", { name: "BUY", pressed: true })).toBeTruthy();
+    fireEvent.keyDown(document, { key: "s" });
     fireEvent.click(screen.getByRole("button", { name: "LIMIT" }));
     fireEvent.change(screen.getByRole("spinbutton", { name: "Order quantity" }), { target: { value: "2" } });
     fireEvent.keyDown(screen.getByRole("spinbutton", { name: "Order quantity" }), { key: "b" });

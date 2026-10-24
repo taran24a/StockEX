@@ -64,6 +64,8 @@ describe("market candle route", () => {
     const query = vi.fn().mockResolvedValue({
       rows: [
         { side: "buy", price_paise: "12500", quantity: "4", order_count: "2" },
+        { side: "sell", price_paise: "12700", quantity: "2", order_count: "1" },
+        { side: "buy", price_paise: "12600", quantity: "1", order_count: "1" },
         { side: "sell", price_paise: "12600", quantity: "3", order_count: "1" }
       ]
     });
@@ -72,8 +74,14 @@ describe("market candle route", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      bids: [{ pricePaise: 12500, quantity: 4, orderCount: 2 }],
-      asks: [{ pricePaise: 12600, quantity: 3, orderCount: 1 }]
+      bids: [
+        { pricePaise: 12600, quantity: 1, orderCount: 1 },
+        { pricePaise: 12500, quantity: 4, orderCount: 2 }
+      ],
+      asks: [
+        { pricePaise: 12600, quantity: 3, orderCount: 1 },
+        { pricePaise: 12700, quantity: 2, orderCount: 1 }
+      ]
     });
     expect(query.mock.calls[0]?.[1]).toEqual(["ALFA"]);
     expect(query.mock.calls[0]?.[0]).toContain("orders.status IN ('open', 'partially_filled')");
