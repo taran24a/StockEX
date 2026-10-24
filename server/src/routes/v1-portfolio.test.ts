@@ -204,4 +204,39 @@ describe("v1 portfolio routes", () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ match: true, differences: [] });
   });
+
+  it("streams an account-scoped CSV trade statement", async () => {
+    const executedAt = new Date("2026-10-25T10:15:00.000Z");
+    const query = vi.fn((sql: string) => {
+      if (sql.includes("FROM accounts")) {
+        return Promise.resolve({
+          rows: [{ id: accountId, cash_balance: "1000", reserved_balance: "0", opening_balance: "0" }]
+        });
+      }
+      return Promise.resolve({
+        rows: [{
+          id: instrumentId,
+          executed_at: executedAt,
+          symbol: "ALFA",
+          side: "buy",
+          quantity: "2",
+          price: "12500",
+          fee: "8"
+        }]
+      });
+    });
+
+    const response = await request(portfolioApp(query))
+      .get("/api/v1/portfolio/statement.csv")
+      .set(authorization());
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/csv");
+    expect(response.headers["content-disposition"]).toContain("tradewise-trade-statement.csv");
+    expect(response.text).toBe(
+      "executed_at,symbol,side,quantity,price_paise,fee_paise\r\n" +
+      '"2026-10-25T10:15:00.000Z","ALFA","buy","2","12500","8"\r\n'
+    );
+    expect(query).toHaveBeenCalledWith(expect.stringContaining("JOIN orders AS own_order"), [accountId, 500]);
+  });
 });

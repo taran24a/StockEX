@@ -8,7 +8,7 @@ export function AdminUsersPanel({ token, role }: { token: string | null; role: U
   // SYLLABUS: validation
   const usersQuery = useQuery({
     queryKey: ["admin-users"],
-    queryFn: () => apiRequest("/api/admin/users", AdminUsersResponseSchema, token ?? undefined),
+    queryFn: () => apiRequest("/api/admin/users?limit=100", AdminUsersResponseSchema, token ?? undefined),
     enabled: role === "admin" && token !== null
   });
 

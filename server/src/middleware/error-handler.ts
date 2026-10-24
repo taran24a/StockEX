@@ -9,10 +9,14 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, request, respo
   const requestLogger = response.locals.logger ?? logger;
   if (error instanceof multer.MulterError) {
     const isTooLarge = error.code === "LIMIT_FILE_SIZE";
+    const isAvatar = error.field === "avatar";
+    const uploadLimitMessage = isAvatar
+      ? "Avatar must be no larger than 2 MB"
+      : "Uploaded file must be no larger than 5 MB";
     const uploadError = new ApiError(
       isTooLarge ? 413 : 400,
       isTooLarge ? "UPLOAD_TOO_LARGE" : "INVALID_UPLOAD",
-      isTooLarge ? "Avatar must be no larger than 2 MB" : "The avatar upload was invalid"
+      isTooLarge ? uploadLimitMessage : "The uploaded file was invalid"
     );
     response.status(uploadError.status).json(ErrorResponseSchema.parse({
       error: { code: uploadError.code, message: uploadError.message }

@@ -35,8 +35,52 @@ export const AdminUserSchema = UserSchema.extend({
   createdAt: z.iso.datetime()
 });
 
+export const PaginationResponseSchema = z.object({
+  limit: z.number().int().positive(),
+  offset: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative()
+});
+
 export const AdminUsersResponseSchema = z.object({
-  users: z.array(AdminUserSchema)
+  users: z.array(AdminUserSchema),
+  pagination: PaginationResponseSchema
+});
+
+export const AdminRoleUpdateSchema = z.object({
+  role: z.enum(["user", "admin"])
+});
+
+export const AdminInstrumentImportRowSchema = z.object({
+  symbol: z.string().regex(/^[A-Z][A-Z0-9.-]{0,31}$/),
+  name: z.string().trim().min(1).max(120),
+  sector: z.string().trim().min(1).max(80),
+  tickSizePaise: z.coerce.number().int().positive().safe(),
+  lastPricePaise: z.coerce.number().int().positive().safe()
+});
+
+export const AdminInstrumentImportResponseSchema = z.object({
+  imported: z.number().int().nonnegative().safe()
+});
+
+export const AdminAuditResponseSchema = z.object({
+  events: z.array(z.object({
+    id: z.uuid(),
+    aggregateType: z.string(),
+    aggregateId: z.uuid(),
+    eventType: z.string(),
+    sequenceNumber: z.number().int().positive().safe(),
+    payload: z.record(z.string(), z.unknown()),
+    requestId: z.uuid().nullable(),
+    createdAt: z.iso.datetime()
+  })),
+  pagination: PaginationResponseSchema
+});
+
+export const AdminStatsResponseSchema = z.object({
+  users: z.number().int().nonnegative().safe(),
+  orders: z.number().int().nonnegative().safe(),
+  volumePaise: paiseSchema,
+  rejectedOrderPct: z.number().min(0).max(100)
 });
 
 export const AuthResponseSchema = z.object({
@@ -488,6 +532,14 @@ export const TradeQuerySchema = z.object({
 
 export const PaginationQuerySchema = TradeQuerySchema;
 
+export const AdminAuditQuerySchema = z.object({
+  ...TradeQuerySchema.shape,
+  aggregateType: z.string().trim().min(1).max(64).optional(),
+  aggregateId: z.uuid().optional(),
+  eventType: z.string().trim().min(1).max(128).optional(),
+  requestId: z.uuid().optional()
+});
+
 export const OrdersQuerySchema = TradeQuerySchema.extend({
   symbol: symbolSchema.optional(),
   side: OrderSideSchema.optional(),
@@ -531,6 +583,12 @@ export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 export type User = z.infer<typeof UserSchema>;
 export type AdminUser = z.infer<typeof AdminUserSchema>;
 export type AdminUsersResponse = z.infer<typeof AdminUsersResponseSchema>;
+export type AdminRoleUpdate = z.infer<typeof AdminRoleUpdateSchema>;
+export type AdminInstrumentImportRow = z.infer<typeof AdminInstrumentImportRowSchema>;
+export type AdminInstrumentImportResponse = z.infer<typeof AdminInstrumentImportResponseSchema>;
+export type AdminAuditQuery = z.infer<typeof AdminAuditQuerySchema>;
+export type AdminAuditResponse = z.infer<typeof AdminAuditResponseSchema>;
+export type AdminStatsResponse = z.infer<typeof AdminStatsResponseSchema>;
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
 export type InstrumentRecord = z.infer<typeof InstrumentSchema>;
 export type Instrument = z.infer<typeof QuoteSchema>;
@@ -587,6 +645,7 @@ export type TradeQuery = z.infer<typeof TradeQuerySchema>;
 export type OrdersQuery = z.infer<typeof OrdersQuerySchema>;
 export type PaginatedOrdersResponse = z.infer<typeof PaginatedOrdersResponseSchema>;
 export type PaginationQuery = z.infer<typeof PaginationQuerySchema>;
+export type PaginationResponse = z.infer<typeof PaginationResponseSchema>;
 export type Trade = z.infer<typeof TradeSchema>;
 export type TradesResponse = z.infer<typeof TradesResponseSchema>;
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;

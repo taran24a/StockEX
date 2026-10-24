@@ -36,7 +36,8 @@ describe("AdminUsersPanel", () => {
         displayName: "Example Trader",
         role: "user",
         createdAt: "2026-10-20T10:30:00.000Z"
-      }]
+      }],
+      pagination: { limit: 100, offset: 0, total: 1 }
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -46,7 +47,7 @@ describe("AdminUsersPanel", () => {
     expect(await screen.findByText("Example Trader")).toBeTruthy();
     expect(screen.getByText("trader@example.com")).toBeTruthy();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      "/api/admin/users",
+      "/api/admin/users?limit=100",
       expect.objectContaining({ headers: expect.any(Headers) })
     ));
     expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get("Authorization")).toMatch(/^Bearer /);

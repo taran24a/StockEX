@@ -11,6 +11,7 @@ import type { Pool } from "pg";
 import type { Environment } from "./config/index.js";
 import { ForbiddenError, NotFoundError, TooManyRequestsError } from "./services/errors.js";
 import { createAuthRouter } from "./routes/auth.js";
+import { createAvatarRouter } from "./routes/avatar.js";
 import { createOrdersRouter } from "./routes/orders.js";
 import { createPortfolioRouter } from "./routes/portfolio.js";
 import { createQuotesRouter } from "./routes/quotes.js";
@@ -127,6 +128,27 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         "/api/v1/auth/me/avatar": {
           post: { summary: "Upload a profile avatar", responses: { "201": { description: "Avatar uploaded" } } }
         },
+        "/api/v1/users/me/avatar": {
+          post: { summary: "Upload a profile avatar", responses: { "201": { description: "Avatar uploaded" } } }
+        },
+        "/api/v1/portfolio/statement.csv": {
+          get: { summary: "Download a streamed trade statement", responses: { "200": { description: "CSV trade statement" } } }
+        },
+        "/api/admin/instruments/import": {
+          post: { summary: "Import instruments from CSV (admin only)", responses: { "200": { description: "Instruments imported" } } }
+        },
+        "/api/admin/users": {
+          get: { summary: "List paginated users (admin only)", responses: { "200": { description: "User page" } } }
+        },
+        "/api/admin/users/{id}/role": {
+          patch: { summary: "Update a user role (admin only)", responses: { "200": { description: "Role updated" } } }
+        },
+        "/api/admin/audit": {
+          get: { summary: "Query domain-event audit records (admin only)", responses: { "200": { description: "Audit events" } } }
+        },
+        "/api/admin/stats": {
+          get: { summary: "Get platform trading statistics (admin only)", responses: { "200": { description: "Admin statistics" } } }
+        },
         "/api/quotes": {
           get: { summary: "Get synthetic market quotes", responses: { "200": { description: "Current quotes" } } }
         },
@@ -158,13 +180,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         "/api/portfolio": {
           get: { summary: "Get portfolio positions", responses: { "200": { description: "Portfolio" } } }
         },
-        "/api/trades": { get: { summary: "Get trade history", responses: { "200": { description: "Trades" } } } },
-        "/api/admin/users": {
-          get: {
-            summary: "List users (admin only)",
-            responses: { "200": { description: "User list" }, "403": { description: "Forbidden" } }
-          }
-        }
+        "/api/trades": { get: { summary: "Get trade history", responses: { "200": { description: "Trades" } } } }
       }
     })
   );
@@ -183,6 +199,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
     );
     const authRouter = createAuthRouter(pool, environment, objectStorage);
     app.use("/api/v1/auth", authRouter);
+    app.use("/api/v1/users", createAvatarRouter(pool, environment, objectStorage));
     app.use("/api/v1/orders", createV1OrdersRouter(pool, environment.JWT_SECRET));
     app.use("/api/v1", createV1PortfolioRouter(pool, environment.JWT_SECRET));
     app.use("/api/v1/risk", createRiskRouter(pool, environment.JWT_SECRET));

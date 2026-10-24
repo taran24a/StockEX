@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import {
   AccountPortfolioResponseSchema,
   LedgerEntrySchema,
@@ -13,6 +15,7 @@ import { databaseInteger } from "../db/values.js";
 import { validateQuery, validatedQuery } from "../http-validation.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { NotFoundError } from "../services/errors.js";
+import { logger } from "../logger.js";
 import {
   calculateDayChangePaise,
   calculatePortfolio,
@@ -77,6 +80,83 @@ interface LivePositionRow {
   symbol: string;
   quantity: string | number;
   avg_cost: string | number;
+}
+
+interface TradeStatementRow {
+  id: string;
+  executed_at: Date;
+  symbol: string;
+  side: "buy" | "sell";
+  quantity: string | number;
+  price: string | number;
+  fee: string | number;
+}
+
+const statementBatchSize = 500;
+
+function csvCell(value: string | number): string {
+  return `"${String(value).replaceAll('"', '""')}"`;
+}
+
+async function* tradeStatement(pool: Pool, accountId: string): AsyncGenerator<string> {
+  yield "executed_at,symbol,side,quantity,price_paise,fee_paise\r\n";
+  let cursor: { executedAt: Date; id: string } | undefined;
+  while (true) {
+    const cursorFilter = cursor === undefined
+      ? ""
+      : "WHERE (trade.executed_at, trade.id) > ($2, $3)";
+    const limitParameter = cursor === undefined ? "$2" : "$4";
+    const values = cursor === undefined
+      ? [accountId, statementBatchSize]
+      : [accountId, cursor.executedAt, cursor.id, statementBatchSize];
+    const result = await pool.query<TradeStatementRow>(
+      `SELECT trade.id, trade.executed_at, trade.symbol, trade.side, trade.quantity, trade.price,
+              COALESCE((
+                SELECT ABS(SUM(ledger.amount))
+                FROM ledger_entries AS ledger
+                WHERE ledger.account_id = $1
+                  AND ledger.fill_id = trade.id
+                  AND ledger.entry_type = 'fee'
+              ), 0) AS fee
+       FROM (
+         SELECT fill.id, fill.executed_at, instrument.symbol, own_order.side,
+                fill.quantity, fill.price
+         FROM fills AS fill
+         JOIN orders AS own_order ON own_order.id = fill.order_id
+         JOIN instruments AS instrument ON instrument.id = own_order.instrument_id
+         WHERE own_order.account_id = $1
+         UNION ALL
+         SELECT fill.id, fill.executed_at, instrument.symbol, counter_order.side,
+                fill.quantity, fill.price
+         FROM fills AS fill
+         JOIN orders AS counter_order ON counter_order.id = fill.counter_order_id
+         JOIN instruments AS instrument ON instrument.id = counter_order.instrument_id
+         WHERE counter_order.account_id = $1
+       ) AS trade
+       ${cursorFilter}
+       ORDER BY trade.executed_at ASC, trade.id ASC
+       LIMIT ${limitParameter}`,
+      values
+    );
+    if (result.rows.length === 0) {
+      return;
+    }
+    for (const row of result.rows) {
+      yield [
+        csvCell(row.executed_at.toISOString()),
+        csvCell(row.symbol),
+        csvCell(row.side),
+        csvCell(databaseInteger(row.quantity, "trade quantity")),
+        csvCell(databaseInteger(row.price, "trade price")),
+        csvCell(databaseInteger(row.fee, "trade fee"))
+      ].join(",") + "\r\n";
+    }
+    const lastRow = result.rows.at(-1);
+    if (lastRow === undefined || result.rows.length < statementBatchSize) {
+      return;
+    }
+    cursor = { executedAt: lastRow.executed_at, id: lastRow.id };
+  }
 }
 
 async function loadAccount(pool: Pool, userId: string): Promise<AccountRow> {
@@ -155,6 +235,19 @@ export function createV1PortfolioRouter(pool: Pool, secret: string): Router {
       holdings: portfolio.holdings,
       totalEquityPaise: portfolio.totalEquityPaise
     }));
+  });
+
+  router.get("/portfolio/statement.csv", requireAuth, async (request, response) => {
+    const account = await loadAccount(pool, request.auth!.id);
+    response.setHeader("Content-Type", "text/csv; charset=utf-8");
+    response.setHeader("Content-Disposition", 'attachment; filename="tradewise-trade-statement.csv"');
+    const stream = Readable.from(tradeStatement(pool, account.id));
+    void pipeline(stream, response).catch((error: unknown) => {
+      logger.error({ err: error, accountId: account.id }, "Trade statement stream failed");
+      if (!response.destroyed) {
+        response.destroy(error instanceof Error ? error : undefined);
+      }
+    });
   });
 
   router.get("/portfolio/performance", requireAuth, async (request, response) => {
