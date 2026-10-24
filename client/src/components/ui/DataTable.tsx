@@ -127,7 +127,10 @@ export function DataTable<Row>({
       </div>
       <nav aria-label="Table pagination" className="flex items-center justify-between gap-3">
         <p className="text-xs text-slate-500">
-          Showing {currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, sortedData.length)} of {sortedData.length}
+          Showing {currentPage * pageSize + 1}–{Math.min(
+            totalCount === undefined ? (currentPage + 1) * pageSize : currentPage * pageSize + sortedData.length,
+            totalCount ?? sortedData.length
+          )} of {totalCount ?? sortedData.length}
         </p>
         <div className="flex gap-2">
           <Button disabled={currentPage === 0} onClick={() => {
