@@ -264,6 +264,7 @@ export function Dashboard() {
     const socket = new WebSocket(url);
     let active = true;
 
+    // SYLLABUS: DOM events via useRef/addEventListener
     socket.addEventListener("message", (event) => {
       try {
         const payload: unknown = JSON.parse(String(event.data));

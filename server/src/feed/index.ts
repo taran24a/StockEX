@@ -26,6 +26,7 @@ websocketServer.on("connection", (socket) => {
 });
 
 const timer = setInterval(() => {
+  // SYLLABUS: event loop
   quotes = advanceQuotes(quotes);
   const update = JSON.stringify(QuotesResponseSchema.parse({ quotes }));
   for (const socket of websocketServer.clients) {
