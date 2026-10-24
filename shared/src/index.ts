@@ -390,6 +390,31 @@ export const RiskRulesSchema = RiskRulesInputSchema.extend({
   updatedAt: z.iso.datetime()
 });
 
+export const RiskPreviewRequestSchema = z.object({
+  symbol: symbolSchema,
+  side: OrderSideSchema,
+  quantity: quantitySchema
+});
+
+export const RiskPreviewResponseSchema = z.object({
+  symbol: symbolSchema,
+  sector: z.string().trim().min(1),
+  side: OrderSideSchema,
+  quantity: quantitySchema,
+  pricePaise: positivePaiseSchema,
+  orderNotionalPaise: positivePaiseSchema,
+  totalEquityPaise: paiseSchema,
+  currentStockPct: z.number().nonnegative(),
+  projectedStockPct: z.number().nonnegative(),
+  currentSectorPct: z.number().nonnegative(),
+  projectedSectorPct: z.number().nonnegative(),
+  rejection: z.string().min(1).nullable()
+});
+
+export const RiskAlertReadRequestSchema = z.object({
+  acknowledged: z.boolean()
+});
+
 export const RiskConcentrationSchema = z.object({
   name: z.string().trim().min(1),
   marketValuePaise: paiseSchema,
@@ -649,6 +674,9 @@ export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
 export type PaginatedLedgerResponse = z.infer<typeof PaginatedLedgerResponseSchema>;
 export type RiskRules = z.infer<typeof RiskRulesSchema>;
 export type RiskRulesInput = z.infer<typeof RiskRulesInputSchema>;
+export type RiskPreviewRequest = z.infer<typeof RiskPreviewRequestSchema>;
+export type RiskPreviewResponse = z.infer<typeof RiskPreviewResponseSchema>;
+export type RiskAlertReadRequest = z.infer<typeof RiskAlertReadRequestSchema>;
 export type RiskSummary = z.infer<typeof RiskSummarySchema>;
 export type RiskAlert = z.infer<typeof RiskAlertSchema>;
 export type RiskAlertsResponse = z.infer<typeof RiskAlertsResponseSchema>;
