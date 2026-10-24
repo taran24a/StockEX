@@ -192,7 +192,7 @@ function OrderForm({
   );
 }
 
-export function Dashboard() {
+export function Dashboard({ showHeader = true }: { showHeader?: boolean }) {
   const { token, user, avatarUrl, uploadAvatar, signOut } = useAuth();
   const queryClient = useQueryClient();
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
@@ -319,8 +319,8 @@ export function Dashboard() {
   ].filter((error): error is Error => error instanceof Error);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-950/90">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      {showHeader && <header className="border-b border-slate-800 bg-slate-950/90">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
           <div>
             <p className="text-lg font-bold tracking-tight">TradeWise</p>
@@ -344,7 +344,7 @@ export function Dashboard() {
             <button className="text-sm text-slate-400 hover:text-white" onClick={signOut} type="button">Sign out</button>
           </div>
         </div>
-      </header>
+      </header>}
 
       <div className="mx-auto max-w-7xl space-y-6 px-5 py-8">
         {avatarError !== null && <QueryError message={avatarError} />}
@@ -476,6 +476,6 @@ export function Dashboard() {
           </aside>
         </section>
       </div>
-    </main>
+    </div>
   );
 }

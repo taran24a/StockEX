@@ -13,6 +13,10 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: environment.VITE_API_PROXY_TARGET || "http://localhost:3000",
           ws: true
+        },
+        "/ws": {
+          target: environment.VITE_API_PROXY_TARGET || "http://localhost:3000",
+          ws: true
         }
       }
     },

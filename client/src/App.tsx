@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import type { LoginRequest, RegisterRequest } from "@tradewise/shared";
 import { AuthForm } from "./AuthForm";
@@ -8,8 +8,7 @@ import { ProtectedRoute } from "./components/routes/ProtectedRoute";
 import { RoleRoute } from "./components/routes/RoleRoute";
 import { Card, ErrorBoundary, Spinner } from "./components/ui";
 import { LandingPage } from "./LandingPage";
-
-const Dashboard = lazy(() => import("./Dashboard").then((module) => ({ default: module.Dashboard })));
+import { WorkspaceLayout } from "./WorkspaceLayout";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -144,14 +143,6 @@ function AuthStorageWarning() {
   );
 }
 
-function AppStub() {
-  return (
-    <Suspense fallback={<div className="grid min-h-screen place-items-center"><Spinner label="Loading workspace" /></div>}>
-      <Dashboard />
-    </Suspense>
-  );
-}
-
 function AdminStub() {
   return (
     <main className="min-h-screen bg-slate-950 p-6 text-slate-100 sm:p-10">
@@ -176,7 +167,7 @@ function ApplicationRoutes() {
         <Route element={<AuthPage mode="login" />} path="/login" />
         <Route element={<AuthPage mode="register" />} path="/register" />
         <Route
-          element={<ProtectedRoute><AppStub /></ProtectedRoute>}
+          element={<ProtectedRoute><WorkspaceLayout /></ProtectedRoute>}
           path="/app/*"
         />
         <Route

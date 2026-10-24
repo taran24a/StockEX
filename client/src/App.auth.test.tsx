@@ -24,6 +24,20 @@ vi.mock("./Dashboard", () => ({
     return <div>{`${location.pathname}${location.search}${location.hash}`}</div>;
   }
 }));
+vi.mock("./DashboardOverview", () => ({
+  DashboardOverview: () => {
+    const location = useLocation();
+    return <div>{`${location.pathname}${location.search}${location.hash}`}</div>;
+  },
+  ProfileStub: () => <div>Profile route</div>,
+  WorkspaceStub: () => {
+    const location = useLocation();
+    return <div>{`${location.pathname}${location.search}${location.hash}`}</div>;
+  }
+}));
+vi.mock("./hooks/useQuotesSocket", () => ({
+  useQuotesSocket: () => ({ status: "disconnected", recentOrderEvents: [], error: null })
+}));
 
 const user = {
   id: "8af8401d-00c7-49f0-aeae-914c82dbdd72",
@@ -52,7 +66,11 @@ beforeEach(() => {
   apiRequestMock.mockImplementation((path: string) => Promise.resolve(
     path === "/api/auth/login"
       ? { token: "session-token", expiresAt: "2027-10-25T00:00:00.000Z", user }
-      : { user, avatarUrl: null }
+      : path === "/api/v1/portfolio"
+        ? { totalEquityPaise: 0 }
+        : path.startsWith("/api/risk/alerts")
+          ? { alerts: [] }
+          : { user, avatarUrl: null }
   ));
 });
 
