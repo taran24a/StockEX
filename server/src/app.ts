@@ -24,11 +24,13 @@ import { createV1PortfolioRouter } from "./routes/v1-portfolio.js";
 import { createRiskRouter } from "./routes/risk.js";
 import type { Client as MinioClient } from "minio";
 import { logger } from "./logger.js";
+import type { SimulationControls } from "./services/simulation-controls.js";
 
 export interface AppDependencies {
   pool: Pool;
   environment: Environment;
   objectStorage: MinioClient;
+  simulationControls?: SimulationControls;
 }
 
 export function createApp(dependencies?: AppDependencies): express.Express {
@@ -133,7 +135,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
     app.use("/api/v1", createV1PortfolioRouter(pool, environment.JWT_SECRET));
     app.use("/api/v1/risk", createRiskRouter(pool, environment.JWT_SECRET));
     app.use("/api/auth", authRouter);
-    app.use("/api/admin", createAdminRouter(pool, environment.JWT_SECRET));
+    app.use("/api/admin", createAdminRouter(pool, environment.JWT_SECRET, dependencies.simulationControls));
     app.use("/api/market", createMarketRouter(pool, environment.MOCK_FEED_URL));
     app.use("/api/watchlists", createWatchlistsRouter(pool, environment.JWT_SECRET));
     app.use("/api/quotes", createQuotesRouter(environment.MOCK_FEED_URL));

@@ -1,14 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import type { LoginRequest, RegisterRequest } from "@tradewise/shared";
 import { AuthForm } from "./AuthForm";
 import { AuthProvider, useAuth } from "./auth";
 import { ProtectedRoute } from "./components/routes/ProtectedRoute";
 import { RoleRoute } from "./components/routes/RoleRoute";
-import { Card, ErrorBoundary, Spinner } from "./components/ui";
+import { ErrorBoundary, Spinner } from "./components/ui";
 import { LandingPage } from "./LandingPage";
 import { WorkspaceLayout } from "./WorkspaceLayout";
+
+const AdminPage = lazy(() => import("./Admin").then((module) => ({ default: module.AdminPage })));
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -143,21 +145,6 @@ function AuthStorageWarning() {
   );
 }
 
-function AdminStub() {
-  return (
-    <main className="min-h-screen bg-slate-950 p-6 text-slate-100 sm:p-10">
-      <Card className="mx-auto max-w-3xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Administrator</p>
-        <h1 className="mt-2 text-2xl font-semibold">Admin workspace</h1>
-        <p className="mt-2 text-sm text-slate-400">This route is ready for the admin workspace pages.</p>
-        <Link className="mt-5 inline-block text-sm font-medium text-cyan-300 hover:text-cyan-200" to="/app/dashboard">
-          Go to trading app
-        </Link>
-      </Card>
-    </main>
-  );
-}
-
 function ApplicationRoutes() {
   return (
     <>
@@ -171,7 +158,7 @@ function ApplicationRoutes() {
           path="/app/*"
         />
         <Route
-          element={<RoleRoute role="admin"><AdminStub /></RoleRoute>}
+          element={<RoleRoute role="admin"><Suspense fallback={<div className="grid min-h-screen place-items-center"><Spinner label="Loading admin workspace" /></div>}><AdminPage /></Suspense></RoleRoute>}
           path="/admin/*"
         />
         <Route element={<Navigate to="/" replace />} path="*" />

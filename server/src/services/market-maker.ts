@@ -5,6 +5,7 @@ import { databaseInteger } from "../db/values.js";
 import { withTransaction } from "../db/transaction.js";
 import { logger } from "../logger.js";
 import { calculateBuyReservation } from "../engine/order-finance.js";
+import type { SimulationControls } from "./simulation-controls.js";
 
 const BOT_EMAIL = "liquidity-bot@tradewise.internal";
 const ORDER_QUANTITY = 100;
@@ -29,12 +30,17 @@ interface EventRow {
   payload: Record<string, unknown>;
 }
 
-export function startMarketMaker(pool: Pool, intervalMs = 5_000): () => void {
+export function startMarketMaker(
+  pool: Pool,
+  intervalMs = 5_000,
+  simulationControls?: SimulationControls
+): () => void {
   let running = false;
   let stopped = false;
+  let paused = false;
 
   const tick = async (): Promise<void> => {
-    if (running || stopped) {
+    if (running || stopped || paused) {
       return;
     }
     running = true;
@@ -170,9 +176,14 @@ export function startMarketMaker(pool: Pool, intervalMs = 5_000): () => void {
   };
 
   const timer = setInterval(() => void tick(), intervalMs);
+  const unregister = simulationControls?.register("marketMaker", (nextPaused) => {
+    paused = nextPaused;
+    if (!paused) void tick();
+  });
   void tick();
   return () => {
     stopped = true;
     clearInterval(timer);
+    unregister?.();
   };
 }

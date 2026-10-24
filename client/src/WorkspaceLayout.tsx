@@ -58,7 +58,7 @@ function Sidebar({
 }) {
   const { user } = useAuth();
   const links = user?.role === "admin"
-    ? [...navigation, { label: "Admin", path: "/admin/users", mark: "A" }]
+    ? [...navigation, { label: "Admin", path: "/admin", mark: "A" }]
     : navigation;
 
   return (

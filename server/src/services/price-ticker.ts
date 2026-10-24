@@ -3,13 +3,20 @@ import { eventBus } from "../events/bus.js";
 import { logger } from "../logger.js";
 import { fetchMarketPrices } from "../market/feed-client.js";
 import { quoteCache } from "../market/quote-cache.js";
+import type { SimulationControls } from "./simulation-controls.js";
 
-export function startPriceTicker(pool: Pool, feedUrl: string, intervalMs = 1_000): () => void {
+export function startPriceTicker(
+  pool: Pool,
+  feedUrl: string,
+  intervalMs = 1_000,
+  simulationControls?: SimulationControls
+): () => void {
   let stopped = false;
+  let paused = false;
   let polling = false;
 
   const tick = async (): Promise<void> => {
-    if (stopped || polling) {
+    if (stopped || paused || polling) {
       return;
     }
     polling = true;
@@ -42,10 +49,15 @@ export function startPriceTicker(pool: Pool, feedUrl: string, intervalMs = 1_000
   const timer = setInterval(() => {
     void tick();
   }, intervalMs);
+  const unregister = simulationControls?.register("ticker", (nextPaused) => {
+    paused = nextPaused;
+    if (!paused) void tick();
+  });
   void tick();
 
   return () => {
     stopped = true;
     clearInterval(timer);
+    unregister?.();
   };
 }

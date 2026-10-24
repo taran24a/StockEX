@@ -11,6 +11,8 @@ import {
   AdminStatsResponseSchema,
   AdminUserSchema,
   AdminUsersResponseSchema,
+  SimulationControlRequestSchema,
+  SimulationControlsResponseSchema,
   VirtualResetCooldownResponseSchema,
   VirtualResetCooldownSchema,
   TradeQuerySchema
@@ -23,6 +25,7 @@ import { databaseInteger } from "../db/values.js";
 import { validateBody, validateParams, validateQuery, validatedBody, validatedParams, validatedQuery } from "../http-validation.js";
 import { authenticate, requireRole } from "../middleware/authenticate.js";
 import { ApiError, BadRequestError, NotFoundError } from "../services/errors.js";
+import type { SimulationControls } from "../services/simulation-controls.js";
 
 interface AdminUserRow {
   id: string;
@@ -145,9 +148,31 @@ async function importInstruments(pool: Pool, buffer: Buffer): Promise<number> {
   });
 }
 
-export function createAdminRouter(pool: Pool, secret: string): Router {
+export function createAdminRouter(pool: Pool, secret: string, simulationControls?: SimulationControls): Router {
   const router = Router();
   const requireAdmin = [authenticate(secret), requireRole("admin")];
+
+  router.get("/simulation-controls", ...requireAdmin, (_request, response) => {
+    response.json(SimulationControlsResponseSchema.parse(simulationControls?.getStatus() ?? {
+      marketMaker: { available: false, running: false },
+      ticker: { available: false, running: false }
+    }));
+  });
+
+  router.patch(
+    "/simulation-controls",
+    ...requireAdmin,
+    validateBody(SimulationControlRequestSchema),
+    (_request, response) => {
+      const { name, running } = validatedBody<{ name: "marketMaker" | "ticker"; running: boolean }>(response);
+      const status = simulationControls?.getStatus()[name];
+      if (status?.available !== true) {
+        throw new ApiError(503, "SIMULATION_UNAVAILABLE", "The selected simulation service is unavailable");
+      }
+      simulationControls?.setRunning(name, running);
+      response.json(SimulationControlsResponseSchema.parse(simulationControls?.getStatus()));
+    }
+  );
 
   router.get("/settings/virtual-account-reset-cooldown", ...requireAdmin, async (_request, response) => {
     const result = await pool.query<{ value: number | string; updated_at: Date }>(

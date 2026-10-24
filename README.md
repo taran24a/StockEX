@@ -72,6 +72,7 @@ The protected `/app/risk` workspace edits account trading limits, displays conce
 The protected `/app/profile` workspace edits the display name, uploads a validated avatar, changes the password, and shows account details. It also provides a typed-confirmation reset for the virtual account; reset cancels open orders, clears positions, restores ₹10,00,000 virtual cash, and retains historical trading and ledger records. Administrators can configure the global reset cooldown (initially 24 hours). Migration `009_virtual_account_reset` must be applied before using the profile/reset endpoints.
 
 Administrators also see a read-only user directory in the dashboard, backed by this endpoint.
+The `/admin` workspace is restricted to administrator accounts and includes platform statistics, user role management, instrument CSV import with upload progress, filtered domain-event audit history, and controls to pause or resume the market-maker bot and price ticker.
 
 Authenticated endpoints require a bearer token in the `Authorization` header. Registration and login return a 12-hour token and its `expiresAt` timestamp. Logout is stateless: the client must discard its bearer token. Run `npm run seed` to create/update the local demo account (`demo@tradewise.dev` / `Demo@1234`) and admin account (`admin@tradewise.dev` / `Admin@1234`), each with a ₹10,00,000 virtual balance on first creation.
 

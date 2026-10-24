@@ -110,7 +110,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Upload or replace the current user's avatar
-      description: Accepts JPEG, PNG, or WebP files up to 2 MB; returns a time-limited MinIO URL.
+      description: Accepts JPEG, PNG, or WebP files up to 2 MB; returns a time-limited S3-compatible object-storage URL.
       security: [{BearerAuth: []}]
       requestBody:
         required: true
@@ -231,6 +231,33 @@ paths:
         "200": {description: Updated cooldown}
         "400": {$ref: "#/components/responses/BadRequest"}
         "403": {$ref: "#/components/responses/Forbidden"}
+  /api/admin/simulation-controls:
+    get:
+      tags: [Administration]
+      summary: Get market-maker and price-ticker runtime status
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Service availability and running states}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    patch:
+      tags: [Administration]
+      summary: Pause or resume a simulation service
+      security: [{BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, running]
+              properties:
+                name: {type: string, enum: [marketMaker, ticker]}
+                running: {type: boolean}
+      responses:
+        "200": {description: Updated service states}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "503": {description: The simulation service is unavailable}
   /api/market/quotes:
     get:
       tags: [Market]

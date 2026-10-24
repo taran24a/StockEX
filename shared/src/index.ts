@@ -88,6 +88,16 @@ export const AdminStatsResponseSchema = z.object({
   rejectedOrderPct: z.number().min(0).max(100)
 });
 
+export const SimulationControlsResponseSchema = z.object({
+  marketMaker: z.object({ available: z.boolean(), running: z.boolean() }),
+  ticker: z.object({ available: z.boolean(), running: z.boolean() })
+});
+
+export const SimulationControlRequestSchema = z.object({
+  name: z.enum(["marketMaker", "ticker"]),
+  running: z.boolean()
+});
+
 export const AuthResponseSchema = z.object({
   token: z.string().min(1),
   expiresAt: z.iso.datetime(),
@@ -678,6 +688,8 @@ export type AdminInstrumentImportResponse = z.infer<typeof AdminInstrumentImport
 export type AdminAuditQuery = z.infer<typeof AdminAuditQuerySchema>;
 export type AdminAuditResponse = z.infer<typeof AdminAuditResponseSchema>;
 export type AdminStatsResponse = z.infer<typeof AdminStatsResponseSchema>;
+export type SimulationControlsResponse = z.infer<typeof SimulationControlsResponseSchema>;
+export type SimulationControlRequest = z.infer<typeof SimulationControlRequestSchema>;
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
 export type InstrumentRecord = z.infer<typeof InstrumentSchema>;
 export type Instrument = z.infer<typeof QuoteSchema>;
