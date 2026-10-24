@@ -14,8 +14,9 @@ vi.mock("./auth", () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => children,
   useAuth: useAuthMock
 }));
-vi.mock("./Dashboard", () => ({
-  Dashboard: () => <div>Dashboard route is intact</div>
+vi.mock("./Markets", () => ({
+  MarketsPage: () => <div>Markets route is intact</div>,
+  MarketDetailPage: () => <div>Market detail route is intact</div>
 }));
 vi.mock("./DashboardOverview", () => ({
   DashboardOverview: () => <div>Dashboard route is intact</div>,
@@ -133,7 +134,7 @@ describe("public landing route", () => {
     await waitFor(() => expect(screen.getByText("Dashboard route is intact")).toBeTruthy());
   });
 
-  it("preserves the rich trading dashboard under the protected markets route", async () => {
+  it("opens the protected searchable markets route", async () => {
     useAuthMock.mockReturnValue({
       token: null,
       user: { id: "1", email: "learner@example.com", displayName: "Learner", role: "user" },
@@ -144,7 +145,21 @@ describe("public landing route", () => {
     });
 
     renderAt("/app/markets");
-    expect(await screen.findByText("Dashboard route is intact")).toBeTruthy();
+    expect(await screen.findByText("Markets route is intact")).toBeTruthy();
+  });
+
+  it("opens a protected instrument detail route", async () => {
+    useAuthMock.mockReturnValue({
+      token: null,
+      user: { id: "1", email: "learner@example.com", displayName: "Learner", role: "user" },
+      ready: true,
+      error: null,
+      signIn: vi.fn(),
+      register: vi.fn()
+    });
+
+    renderAt("/app/markets/ALFA");
+    expect(await screen.findByText("Market detail route is intact")).toBeTruthy();
   });
 
   it("redirects signed-out dashboard visits to login", async () => {

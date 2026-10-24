@@ -9,7 +9,8 @@ import { formatPaise } from "./format";
 import { useQuotesSocket } from "./hooks/useQuotesSocket";
 import { Spinner } from "./components/ui";
 
-const MarketsDashboard = lazy(() => import("./Dashboard").then((module) => ({ default: module.Dashboard })));
+const MarketsPage = lazy(() => import("./Markets").then((module) => ({ default: module.MarketsPage })));
+const MarketDetailPage = lazy(() => import("./Markets").then((module) => ({ default: module.MarketDetailPage })));
 
 const navigation = [
   { label: "Dashboard", path: "/app/dashboard", mark: "D" },
@@ -187,7 +188,9 @@ function WorkspaceTopbar({
     enabled: token !== null
   });
   const activeAlertCount = (alerts.data?.alerts ?? []).filter((alert) => alert.acknowledgedAt === null).length;
-  const title = pageTitles[location.pathname] ?? "Workspace";
+  const title = location.pathname.startsWith("/app/markets/")
+    ? "Market detail"
+    : pageTitles[location.pathname] ?? "Workspace";
   const closeNotifications = () => setNotificationsOpen(false);
   const closeUserMenu = () => setUserMenuOpen(false);
   const statusLabel = status === "connected" ? "Live connection" : status === "connecting" ? "Connecting to live updates" : "Live connection disconnected";
@@ -357,7 +360,8 @@ export function WorkspaceLayout() {
             <Routes>
               <Route element={<Navigate replace to="/app/dashboard" />} index />
               <Route element={<DashboardOverview />} path="dashboard" />
-              <Route element={<MarketsDashboard showHeader={false} />} path="markets" />
+              <Route element={<MarketsPage />} path="markets" />
+              <Route element={<MarketDetailPage />} path="markets/:symbol" />
               <Route element={<WorkspaceStub detail="Your recent orders are available on the dashboard while a dedicated order manager is being built." title="Orders" />} path="orders" />
               <Route element={<WorkspaceStub detail="Your live holdings are shown on the dashboard. A full portfolio workspace is not available yet." title="Portfolio" />} path="portfolio" />
               <Route element={<WorkspaceStub detail="Risk warnings and concentration are summarized on the dashboard. Dedicated risk controls are not available yet." title="Risk" />} path="risk" />

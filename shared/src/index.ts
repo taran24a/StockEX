@@ -148,6 +148,21 @@ export const MarketInstrumentResponseSchema = z.object({
   quote: QuoteSchema.nullable()
 });
 
+export const MarketInstrumentsResponseSchema = z.object({
+  instruments: z.array(MarketInstrumentResponseSchema)
+});
+
+export const MarketDepthLevelSchema = z.object({
+  pricePaise: positivePaiseSchema,
+  quantity: quantitySchema,
+  orderCount: z.number().int().positive().safe()
+});
+
+export const MarketDepthResponseSchema = z.object({
+  bids: z.array(MarketDepthLevelSchema),
+  asks: z.array(MarketDepthLevelSchema)
+});
+
 export const WatchlistSchema = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1).max(80),
@@ -603,6 +618,8 @@ export type Candle = z.infer<typeof CandleSchema>;
 export type CandlesQuery = z.infer<typeof CandlesQuerySchema>;
 export type CandlesResponse = z.infer<typeof CandlesResponseSchema>;
 export type MarketInstrumentResponse = z.infer<typeof MarketInstrumentResponseSchema>;
+export type MarketInstrumentsResponse = z.infer<typeof MarketInstrumentsResponseSchema>;
+export type MarketDepthResponse = z.infer<typeof MarketDepthResponseSchema>;
 export type Watchlist = z.infer<typeof WatchlistSchema>;
 export type WatchlistDetail = z.infer<typeof WatchlistDetailSchema>;
 export type CreateWatchlistRequest = z.infer<typeof CreateWatchlistRequestSchema>;

@@ -3,6 +3,8 @@ import {
   CandleSchema,
   CandlesQuerySchema,
   CandlesResponseSchema,
+  MarketDepthResponseSchema,
+  MarketInstrumentsResponseSchema,
   InstrumentSchema,
   MarketInstrumentResponseSchema,
   QuoteSchema,
@@ -50,8 +52,43 @@ interface CandleRow {
   volume: string | number;
 }
 
+interface MarketDepthRow {
+  side: "buy" | "sell";
+  price_paise: string | number;
+  quantity: string | number;
+  order_count: string | number;
+}
+
 export function createMarketRouter(pool: Pool, feedUrl: string): Router {
   const router = Router();
+
+  router.get("/instruments", async (_request, response) => {
+    let quotes = quoteCache.getAll();
+    if (quotes === undefined) {
+      quotes = await fetchMarketPrices(feedUrl);
+      quoteCache.setMany(quotes);
+    }
+    const quotesBySymbol = new Map(quotes.map((quote) => [quote.symbol, quote]));
+    const result = await pool.query<InstrumentRow>(
+      `SELECT id, symbol, name, sector, tick_size, last_price, created_at, updated_at
+       FROM instruments ORDER BY symbol`
+    );
+    response.json(MarketInstrumentsResponseSchema.parse({
+      instruments: result.rows.map((row) => ({
+        instrument: InstrumentSchema.parse({
+          id: row.id,
+          symbol: row.symbol,
+          name: row.name,
+          sector: row.sector,
+          tickSizePaise: databaseInteger(row.tick_size, "instrument tick size"),
+          lastPricePaise: databaseInteger(row.last_price, "instrument last price"),
+          createdAt: row.created_at.toISOString(),
+          updatedAt: row.updated_at.toISOString()
+        }),
+        quote: quotesBySymbol.get(row.symbol) ?? null
+      }))
+    }));
+  });
 
   router.get("/quotes", async (_request, response) => {
     let quotes = quoteCache.getAll();
@@ -103,6 +140,32 @@ export function createMarketRouter(pool: Pool, feedUrl: string): Router {
       volume: databaseInteger(row.volume, "candle volume")
     }));
     response.json(CandlesResponseSchema.parse({ candles }));
+  });
+
+  router.get("/:symbol/depth", validateParams(SymbolParamsSchema), async (_request, response) => {
+    const { symbol } = validatedParams<z.infer<typeof SymbolParamsSchema>>(response);
+    const result = await pool.query<MarketDepthRow>(
+      `SELECT orders.side, orders.limit_price AS price_paise,
+              SUM(orders.quantity - orders.filled_quantity) AS quantity,
+              COUNT(*) AS order_count
+       FROM orders
+       JOIN instruments ON instruments.id = orders.instrument_id
+       WHERE instruments.symbol = $1
+         AND orders.type = 'limit'
+         AND orders.status IN ('open', 'partially_filled')
+       GROUP BY orders.side, orders.limit_price`,
+      [symbol]
+    );
+    const levels = result.rows.map((row) => ({
+      side: row.side,
+      pricePaise: databaseInteger(row.price_paise, "order book price"),
+      quantity: databaseInteger(row.quantity, "order book quantity"),
+      orderCount: databaseInteger(row.order_count, "order book order count")
+    }));
+    response.json(MarketDepthResponseSchema.parse({
+      bids: levels.filter((level) => level.side === "buy").sort((a, b) => b.pricePaise - a.pricePaise),
+      asks: levels.filter((level) => level.side === "sell").sort((a, b) => a.pricePaise - b.pricePaise)
+    }));
   });
 
   router.get("/:symbol", validateParams(SymbolParamsSchema), async (_request, response) => {

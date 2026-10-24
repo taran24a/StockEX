@@ -3,10 +3,12 @@ import type { Pool } from "pg";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { errorHandler } from "../middleware/error-handler.js";
+import { quoteCache } from "../market/quote-cache.js";
 import { createMarketRouter } from "./market.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  quoteCache.clear();
 });
 
 function marketApp(pool: Pool) {
@@ -17,6 +19,66 @@ function marketApp(pool: Pool) {
 }
 
 describe("market candle route", () => {
+  it("returns searchable instrument data with matching live quotes", async () => {
+    const id = "e246e1cb-8d22-4e59-b139-8fbaf801874d";
+    const quote = {
+      symbol: "ALFA",
+      name: "Alfa Industries",
+      pricePaise: 12_500,
+      changePaise: 100,
+      updatedAt: "2026-01-01T00:00:00.000Z"
+    };
+    quoteCache.set(quote);
+    const query = vi.fn().mockResolvedValue({
+      rows: [{
+        id,
+        symbol: "ALFA",
+        name: "Alfa Industries",
+        sector: "Technology",
+        tick_size: "1",
+        last_price: "12500",
+        created_at: new Date("2026-01-01T00:00:00.000Z"),
+        updated_at: new Date("2026-01-01T00:00:00.000Z")
+      }]
+    });
+
+    const response = await request(marketApp({ query } as unknown as Pool)).get("/market/instruments");
+
+    expect(response.status).toBe(200);
+    expect(response.body.instruments).toEqual([{
+      instrument: {
+        id,
+        symbol: "ALFA",
+        name: "Alfa Industries",
+        sector: "Technology",
+        tickSizePaise: 1,
+        lastPricePaise: 12_500,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z"
+      },
+      quote
+    }]);
+  });
+
+  it("returns aggregated public depth for open limit orders only", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [
+        { side: "buy", price_paise: "12500", quantity: "4", order_count: "2" },
+        { side: "sell", price_paise: "12600", quantity: "3", order_count: "1" }
+      ]
+    });
+
+    const response = await request(marketApp({ query } as unknown as Pool)).get("/market/ALFA/depth");
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      bids: [{ pricePaise: 12500, quantity: 4, orderCount: 2 }],
+      asks: [{ pricePaise: 12600, quantity: 3, orderCount: 1 }]
+    });
+    expect(query.mock.calls[0]?.[1]).toEqual(["ALFA"]);
+    expect(query.mock.calls[0]?.[0]).toContain("orders.status IN ('open', 'partially_filled')");
+  });
+
   it("rejects invalid query parameters before querying the database", async () => {
     const query = vi.fn();
     const response = await request(marketApp({ query } as unknown as Pool))

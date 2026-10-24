@@ -5,7 +5,7 @@ TradeWise is a paper-trading simulator. All balances and trades are virtual; it 
 ## Requirements
 
 - Node.js 20.19 or newer and npm
-- Docker Compose for the local PostgreSQL and MinIO services
+- Docker Compose for local PostgreSQL and RustFS S3-compatible storage
 
 ## Local setup
 
@@ -21,7 +21,7 @@ npm run migrate:up
 npm run dev
 ```
 
-Open <http://localhost:5173>. The API listens on port 3000, the synthetic feed on 4000, PostgreSQL on 5432, and MinIO on 9000 (console: 9001). The API creates its upload bucket when it starts, so wait for MinIO to become ready first.
+Open <http://localhost:5173>. The API listens on port 3000, the synthetic feed on 4000, PostgreSQL on 5432, and RustFS S3-compatible storage on 9000 (console: 9001). The API creates its upload bucket when it starts, so wait for storage to become ready first.
 
 The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scripts include `dev`, `build`, `test`, `lint`, `seed`, `repl`, `demo:modules`, `migrate:up`, `migrate:down`, `candles:generate`, and `candles:import`. `npm run dev` runs the API, client, and separate synthetic feed process. The REPL provides `engine` (a DEMO-symbol order book), `bus` (typed domain event bus), and `pool` (PostgreSQL pool) in its context. Run `npm run demo:modules` to see the ESM/CommonJS interoperability example. Migration 002 adds accounts, instruments, candles, fills, ledger, events, risk, and watchlist tables while preserving existing API tables and data. `npm run migrate:down` rolls back one migration and drops its new trading-domain tables.
 
