@@ -408,6 +408,53 @@ export const PortfolioVerifyResponseSchema = z.object({
   differences: z.array(PortfolioDifferenceSchema)
 });
 
+export const WebSocketChannelSchema = z.enum(["quotes", "orders", "portfolio"]);
+
+export const WebSocketClientMessageSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("subscribe"),
+    channels: z.array(WebSocketChannelSchema).min(1)
+  })
+]);
+
+export const WebSocketServerMessageSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("ready"), userId: z.uuid() }),
+  z.object({
+    type: z.literal("subscribed"),
+    channels: z.array(WebSocketChannelSchema)
+  }),
+  z.object({
+    type: z.literal("quote"),
+    data: QuoteSchema
+  }),
+  z.object({
+    type: z.literal("order.update"),
+    data: z.object({
+      id: z.uuid(),
+      aggregateId: z.uuid(),
+      eventType: z.string().min(1),
+      payload: z.record(z.string(), z.unknown())
+    })
+  }),
+  z.object({
+    type: z.literal("portfolio.update"),
+    data: z.object({
+      accountId: z.uuid(),
+      fillId: z.uuid(),
+      symbol: symbolSchema,
+      side: OrderSideSchema,
+      quantity: quantitySchema,
+      pricePaise: positivePaiseSchema,
+      feePaise: paiseSchema
+    })
+  }),
+  z.object({
+    type: z.literal("error"),
+    code: z.string().min(1),
+    message: z.string().min(1)
+  })
+]);
+
 export const DomainEventSchema = z.object({
   id: z.uuid(),
   aggregateType: z.string().trim().min(1).max(64),
@@ -529,6 +576,9 @@ export type OrderTimelineResponse = z.infer<typeof OrderTimelineResponseSchema>;
 export type OrderReplayFrame = z.infer<typeof OrderReplayFrameSchema>;
 export type OrderReplayResponse = z.infer<typeof OrderReplayResponseSchema>;
 export type PortfolioVerifyResponse = z.infer<typeof PortfolioVerifyResponseSchema>;
+export type WebSocketChannel = z.infer<typeof WebSocketChannelSchema>;
+export type WebSocketClientMessage = z.infer<typeof WebSocketClientMessageSchema>;
+export type WebSocketServerMessage = z.infer<typeof WebSocketServerMessageSchema>;
 export type DomainEvent = z.infer<typeof DomainEventSchema>;
 export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
 export type AvatarResponse = z.infer<typeof AvatarResponseSchema>;

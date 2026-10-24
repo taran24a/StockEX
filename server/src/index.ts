@@ -4,6 +4,7 @@ import { loadEnvironment } from "./config/index.js";
 import { createDatabasePool } from "./db/pool.js";
 import { logger } from "./logger.js";
 import { attachQuoteStream } from "./market/quote-stream.js";
+import { attachTradingWebSocket } from "./market/trading-websocket.js";
 import { startPriceTicker } from "./services/price-ticker.js";
 import { startMarketMaker } from "./services/market-maker.js";
 import { createObjectStorage, ensureUploadBucket } from "./storage.js";
@@ -15,6 +16,7 @@ const objectStorage = createObjectStorage(environment);
 const app = createApp({ pool, environment, objectStorage });
 const server = createServer(app);
 const closeQuoteStream = attachQuoteStream(server, environment.MOCK_FEED_URL);
+const closeTradingWebSocket = attachTradingWebSocket(server, pool, environment.JWT_SECRET);
 let stopPriceTicker = (): void => undefined;
 let stopMarketMaker = (): void => undefined;
 
@@ -41,6 +43,7 @@ function shutdown(signal: NodeJS.Signals): void {
   isShuttingDown = true;
   logger.info({ signal }, "TradeWise API shutting down");
   closeQuoteStream();
+  closeTradingWebSocket();
   stopPriceTicker();
   stopMarketMaker();
   server.close((error) => {

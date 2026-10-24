@@ -4,7 +4,17 @@ import { QuotesResponseSchema } from "@tradewise/shared";
 import { logger } from "../logger.js";
 
 export function attachQuoteStream(server: Server, feedUrl: string): () => void {
-  const apiSockets = new WebSocketServer({ server, path: "/api/quotes/ws" });
+  const apiSockets = new WebSocketServer({ noServer: true });
+
+  const handleUpgrade = (request: import("node:http").IncomingMessage, socket: import("node:stream").Duplex, head: Buffer): void => {
+    if (new URL(request.url ?? "/", "http://localhost").pathname !== "/api/quotes/ws") {
+      return;
+    }
+    apiSockets.handleUpgrade(request, socket, head, (client) => {
+      apiSockets.emit("connection", client, request);
+    });
+  };
+  server.on("upgrade", handleUpgrade);
 
   // SYLLABUS: EventEmitter
   apiSockets.on("connection", (client) => {
@@ -45,6 +55,7 @@ export function attachQuoteStream(server: Server, feedUrl: string): () => void {
   });
 
   return () => {
+    server.off("upgrade", handleUpgrade);
     for (const client of apiSockets.clients) {
       client.close(1001, "Server shutting down");
     }
