@@ -67,6 +67,25 @@ describe("portfolio ledger rebuild and order replay", () => {
     ]);
   });
 
+  it("applies virtual resets to cash and excludes fills before the reset from live holdings", () => {
+    const rebuilt = rebuildPortfolioFromLedger([
+      { fillId: null, entryType: "deposit", amountPaise: 10_000 },
+      { fillId: "fill-a", entryType: "trade_debit", amountPaise: -1_000 },
+      {
+        fillId: null,
+        entryType: "virtual_reset",
+        amountPaise: 1_000,
+        createdAt: "2026-10-25T10:30:00.000Z"
+      }
+    ], fills.slice(0, 1));
+
+    expect(rebuilt).toEqual({
+      cashBalancePaise: 10_000,
+      reservedBalancePaise: 0,
+      holdings: []
+    });
+  });
+
   it("produces account projection frames as order fill events are replayed", () => {
     const events: ReplayEvent[] = [
       {

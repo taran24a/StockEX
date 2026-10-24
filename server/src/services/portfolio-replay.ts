@@ -144,9 +144,11 @@ export function rebuildPortfolioFromLedger(
   }
   const holdings = new Map<string, RebuiltHolding>();
   const lastResetAt = entries
-    .filter((entry) => entry.entryType === "virtual_reset" && entry.createdAt !== undefined)
+    .filter((entry): entry is ReplayLedgerEntry & { createdAt: Date | string } =>
+      entry.entryType === "virtual_reset" && entry.createdAt !== undefined
+    )
     .reduce<number | null>((latest, entry) => {
-      const timestamp = new Date(entry.createdAt!).getTime();
+      const timestamp = new Date(entry.createdAt).getTime();
       return latest === null || timestamp > latest ? timestamp : latest;
     }, null);
   for (const fill of [...fills]

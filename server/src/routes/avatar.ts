@@ -259,6 +259,14 @@ export function createAvatarRouter(
           );
         }
       }
+      const unmatchedReservation = reservedBalance - totalRelease;
+      if (unmatchedReservation > 0) {
+        await client.query(
+          `INSERT INTO ledger_entries (account_id, fill_id, entry_type, amount, balance_after)
+           VALUES ($1, NULL, 'release', $2, $3)`,
+          [account.id, unmatchedReservation, databaseInteger(account.cash_balance, "cash balance")]
+        );
+      }
 
       const positions = await client.query(
         "DELETE FROM positions WHERE account_id = $1",

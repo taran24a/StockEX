@@ -10,7 +10,7 @@ import {
   type User
 } from "@tradewise/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { z } from "zod";
 import { apiRequest } from "./api";
 import { useAuth } from "./auth";
@@ -20,7 +20,7 @@ const avatarFileSchema = z.object({
   size: z.number().int().positive().max(2 * 1024 * 1024)
 });
 
-function ProfileMessage({ children, error = false }: { children: string; error?: boolean }) {
+function ProfileMessage({ children, error = false }: { children: ReactNode; error?: boolean }) {
   return <p className={`profile-message ${error ? "is-error" : ""}`} role={error ? "alert" : "status"}>{children}</p>;
 }
 
@@ -144,27 +144,10 @@ function PasswordForm({ token }: { token: string }) {
     mutationFn: async () => {
       const parsed = ChangePasswordRequestSchema.safeParse({ currentPassword, newPassword });
       if (!parsed.success) throw new Error(parsed.error.issues.map((issue) => issue.message).join("; "));
-      const response = await fetch("/api/v1/users/me/password", {
+      await apiRequest("/api/v1/users/me/password", z.void(), token, {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-          "Content-Type": "application/json"
-        },
         body: JSON.stringify(parsed.data)
       });
-      if (!response.ok) {
-        if (response.status === 401) throw new Error("Your session has expired. Sign in again.");
-        let message = `Password could not be changed (HTTP ${response.status}).`;
-        try {
-          const payload: unknown = await response.json();
-          const parsedError = z.object({ error: z.object({ message: z.string() }) }).safeParse(payload);
-          if (parsedError.success) message = parsedError.data.error.message;
-        } catch {
-          message = `Password could not be changed (HTTP ${response.status}).`;
-        }
-        throw new Error(message);
-      }
     },
     onSuccess: () => {
       setCurrentPassword("");
@@ -248,7 +231,7 @@ function ResetCooldownAdmin({ token }: { token: string }) {
   return (
     <form className="profile-admin-cooldown" onSubmit={(event) => { event.preventDefault(); update.mutate(); }}>
       <label><span>Reset cooldown (hours)</span>
-        <input max={8760} min={1} onChange={(event) => setHours(event.target.value)} type="number" value={currentHours} />
+        <input max="8760" min="1" onChange={(event) => setHours(event.target.value)} type="number" value={String(currentHours)} />
       </label>
       <button className="profile-secondary-action" disabled={update.isPending} type="submit">{update.isPending ? "Saving…" : "Update cooldown"}</button>
       {update.error instanceof Error && <ProfileMessage error>{update.error.message}</ProfileMessage>}
