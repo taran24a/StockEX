@@ -563,7 +563,8 @@ export const AdminAuditQuerySchema = z.object({
 export const OrdersQuerySchema = TradeQuerySchema.extend({
   symbol: symbolSchema.optional(),
   side: OrderSideSchema.optional(),
-  status: OrderStatusSchema.optional()
+  status: OrderStatusSchema.optional(),
+  date: z.iso.date().optional()
 });
 
 export const PaginatedOrdersResponseSchema = z.object({

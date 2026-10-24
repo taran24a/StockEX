@@ -17,7 +17,11 @@ export function DataTable<Row>({
   getRowKey,
   pageSize = 10,
   emptyTitle = "No records yet",
-  emptyDescription = "There is no data to display."
+  emptyDescription = "There is no data to display.",
+  pageIndex,
+  totalCount,
+  onPageChange,
+  onRowClick
 }: {
   columns: DataTableColumn<Row>[];
   data: Row[];
@@ -25,6 +29,10 @@ export function DataTable<Row>({
   pageSize?: number;
   emptyTitle?: string;
   emptyDescription?: string;
+  pageIndex?: number;
+  totalCount?: number;
+  onPageChange?(page: number): void;
+  onRowClick?(row: Row): void;
 }) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"ascending" | "descending">("ascending");
@@ -47,9 +55,11 @@ export function DataTable<Row>({
       return sortDirection === "ascending" ? comparison : -comparison;
     });
   }, [columns, data, sortDirection, sortKey]);
-  const pageCount = Math.max(1, Math.ceil(sortedData.length / pageSize));
-  const currentPage = Math.min(page, pageCount - 1);
-  const visibleRows = sortedData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const pageCount = Math.max(1, Math.ceil((totalCount ?? sortedData.length) / pageSize));
+  const currentPage = Math.min(pageIndex ?? page, pageCount - 1);
+  const visibleRows = totalCount === undefined
+    ? sortedData.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+    : sortedData;
 
   function toggleSort(column: DataTableColumn<Row>): void {
     if (column.sortable !== true || column.value === undefined) {
@@ -92,7 +102,19 @@ export function DataTable<Row>({
           </thead>
           <tbody className="divide-y divide-slate-800 bg-slate-950/50">
             {visibleRows.map((row) => (
-              <tr className="text-slate-300" key={getRowKey(row)}>
+              <tr
+                className={`text-slate-300 ${onRowClick === undefined ? "" : "cursor-pointer hover:bg-slate-900/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400"}`}
+                key={getRowKey(row)}
+                onClick={onRowClick === undefined ? undefined : () => onRowClick(row)}
+                onKeyDown={onRowClick === undefined ? undefined : (event) => {
+                  if (event.target !== event.currentTarget || (event.key !== "Enter" && event.key !== " ")) {
+                    return;
+                  }
+                  event.preventDefault();
+                  onRowClick(row);
+                }}
+                tabIndex={onRowClick === undefined ? undefined : 0}
+              >
                 {columns.map((column) => (
                   <td className={`px-4 py-3 ${column.className ?? ""}`} key={column.key}>
                     {column.render?.(row) ?? column.value?.(row) ?? "—"}
@@ -108,8 +130,16 @@ export function DataTable<Row>({
           Showing {currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, sortedData.length)} of {sortedData.length}
         </p>
         <div className="flex gap-2">
-          <Button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)} variant="secondary">Previous</Button>
-          <Button disabled={currentPage >= pageCount - 1} onClick={() => setPage(currentPage + 1)} variant="secondary">Next</Button>
+          <Button disabled={currentPage === 0} onClick={() => {
+            const nextPage = currentPage - 1;
+            if (onPageChange === undefined) setPage(nextPage);
+            else onPageChange(nextPage);
+          }} variant="secondary">Previous</Button>
+          <Button disabled={currentPage >= pageCount - 1} onClick={() => {
+            const nextPage = currentPage + 1;
+            if (onPageChange === undefined) setPage(nextPage);
+            else onPageChange(nextPage);
+          }} variant="secondary">Next</Button>
         </div>
       </nav>
     </div>

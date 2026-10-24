@@ -975,6 +975,10 @@ export function createV1OrdersRouter(
       values.push(query.status);
       clauses.push(`status = $${values.length}`);
     }
+    if (query.date !== undefined) {
+      values.push(query.date);
+      clauses.push(`created_at >= $${values.length}::date AND created_at < $${values.length}::date + INTERVAL '1 day'`);
+    }
     const where = clauses.join(" AND ");
     const totalResult = await pool.query<{ total: string | number }>(
       `SELECT COUNT(*) AS total FROM orders WHERE ${where}`, values
