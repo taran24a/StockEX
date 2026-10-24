@@ -25,6 +25,38 @@ function authorization() {
 }
 
 describe("v1 order timeline and replay routes", () => {
+  it("filters order history by date without changing the pagination contract", async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{ total: "1" }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: orderId,
+          account_id: accountId,
+          instrument_id: fillId,
+          symbol: "ALFA",
+          side: "buy",
+          type: "limit",
+          quantity: "2",
+          limit_price: "100",
+          filled_quantity: "0",
+          status: "open",
+          idempotency_key: "test-key",
+          created_at: new Date("2026-10-25T10:00:00.000Z")
+        }]
+      });
+
+    const response = await request(historyApp(query))
+      .get("/api/v1/orders?date=2026-10-25&limit=20&offset=0")
+      .set(authorization());
+
+    expect(response.status).toBe(200);
+    expect(response.body.orders).toHaveLength(1);
+    expect(response.body.pagination).toEqual({ limit: 20, offset: 0, total: 1 });
+    expect(query.mock.calls[0]?.[0]).toContain("created_at >= $2::date AND created_at < $2::date + INTERVAL '1 day'");
+    expect(query.mock.calls[0]?.[1]).toEqual([userId, "2026-10-25", 20, 0]);
+    expect(query.mock.calls[1]?.[1]).toEqual([userId, "2026-10-25", 20, 0]);
+  });
+
   it("returns the ordered, human-readable event timeline for an owned order", async () => {
     const query = vi.fn()
       .mockResolvedValueOnce({ rows: [{ id: orderId }] })

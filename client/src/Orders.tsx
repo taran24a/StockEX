@@ -59,6 +59,9 @@ function OrderTimeline({ orderId }: { orderId: string }) {
   if (timeline.error instanceof Error) {
     return <p className="orders-panel-message is-error" role="alert">Order timeline could not be loaded: {timeline.error.message}</p>;
   }
+  if (timeline.data === undefined) {
+    return <p className="orders-panel-message is-error" role="alert">Order timeline could not be loaded.</p>;
+  }
   if (timeline.data.events.length === 0) {
     return <p className="orders-panel-message">No explainable events were recorded for this order.</p>;
   }
@@ -210,7 +213,7 @@ export function OrdersPage() {
   const page = readPage(searchParams);
   const [selectedOrder, setSelectedOrder] = useState<OrderResponse | null>(null);
 
-  const filters = useMemo(() => OrdersQuerySchema.parse({
+  const filterResult = useMemo(() => OrdersQuerySchema.safeParse({
     limit: pageSize,
     offset: page * pageSize,
     ...(statusValue === "" ? {} : { status: statusValue }),
@@ -218,9 +221,13 @@ export function OrdersPage() {
     ...(symbolValue.trim() === "" ? {} : { symbol: symbolValue.trim().toUpperCase() }),
     ...(dateValue === "" ? {} : { date: dateValue })
   }), [dateValue, page, sideValue, statusValue, symbolValue]);
+  const filters = filterResult.success ? filterResult.data : null;
   const ordersQuery = useQuery({
     queryKey: ["orders", "workspace", filters],
     queryFn: () => {
+      if (filters === null) {
+        throw new Error("One or more order filters in the URL are invalid.");
+      }
       const query = new URLSearchParams({
         limit: String(filters.limit),
         offset: String(filters.offset)
@@ -231,7 +238,7 @@ export function OrdersPage() {
       if (filters.date !== undefined) query.set("date", filters.date);
       return apiRequest(`/api/v1/orders?${query}`, PaginatedOrdersResponseSchema, token ?? undefined);
     },
-    enabled: token !== null,
+    enabled: token !== null && filters !== null,
     placeholderData: (previous) => previous
   });
   const cancelOrder = useMutation({
@@ -315,7 +322,8 @@ export function OrdersPage() {
         <button className="orders-reset-button" disabled={searchParams.size === 0} onClick={() => setSearchParams(new URLSearchParams())} type="button">Clear filters</button>
       </section>
 
-      {ordersQuery.isPending ? <p className="orders-panel-message" role="status">Loading orders…</p> :
+      {!filterResult.success ? <p className="orders-panel-message is-error" role="alert">One or more order filters in the URL are invalid.</p> :
+        ordersQuery.isPending ? <p className="orders-panel-message" role="status">Loading orders…</p> :
         ordersQuery.error instanceof Error ? <p className="orders-panel-message is-error" role="alert">Orders could not be loaded: {ordersQuery.error.message}</p> : null}
       {cancelOrder.error instanceof Error && <p className="orders-panel-message is-error" role="alert">Order could not be cancelled: {cancelOrder.error.message}</p>}
       {ordersQuery.data !== undefined && pagination !== undefined && (
