@@ -1,6 +1,6 @@
 import { QuotesResponseSchema } from "@tradewise/shared";
 import { logger } from "../logger.js";
-import { ApiError } from "../errors.js";
+import { ApiError } from "../services/errors.js";
 
 export async function fetchQuotes(feedUrl: string) {
   let response: Response;

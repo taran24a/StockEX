@@ -6,9 +6,15 @@ import {
   PlaceOrderResponseSchema,
   TradeQuerySchema
 } from "@tradewise/shared";
+import type { PlaceOrderRequest, TradeQuery } from "@tradewise/shared";
 import type { Pool } from "pg";
-import { ApiError } from "../errors.js";
-import { validateBody, validateQuery } from "../http-validation.js";
+import { ApiError } from "../services/errors.js";
+import {
+  validatedBody,
+  validatedQuery,
+  validateBody,
+  validateQuery
+} from "../http-validation.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { databaseInteger } from "../db/values.js";
 import { withTransaction } from "../db/transaction.js";
@@ -39,8 +45,8 @@ export function createOrdersRouter(pool: Pool, secret: string, feedUrl: string):
   const router = Router();
   const requireAuth = authenticate(secret);
 
-  router.post("/orders", requireAuth, async (request, response) => {
-    const input = validateBody(PlaceOrderRequestSchema, request.body);
+  router.post("/orders", requireAuth, validateBody(PlaceOrderRequestSchema), async (request, response) => {
+    const input = validatedBody<PlaceOrderRequest>(response);
     const quotes = await fetchQuotes(feedUrl);
     const quote = quotes.find((candidate) => candidate.symbol === input.symbol);
     if (quote === undefined) {
@@ -132,9 +138,9 @@ export function createOrdersRouter(pool: Pool, secret: string, feedUrl: string):
     response.status(201).json(PlaceOrderResponseSchema.parse({ order }));
   });
 
-  router.get("/orders", requireAuth, async (request, response) => {
+  router.get("/orders", requireAuth, validateQuery(TradeQuerySchema), async (request, response) => {
     // SYLLABUS: route/query params
-    const { limit, offset } = validateQuery(TradeQuerySchema, request);
+    const { limit, offset } = validatedQuery<TradeQuery>(response);
     const result = await pool.query<OrderRow>(
       `SELECT id, symbol, side, quantity, price_paise, total_paise, created_at
        FROM orders

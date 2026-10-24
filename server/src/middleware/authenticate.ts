@@ -1,7 +1,7 @@
 import type { RequestHandler } from "express";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
-import { ApiError } from "../errors.js";
+import { ApiError } from "../services/errors.js";
 
 const ClaimsSchema = z.object({
   sub: z.uuid(),

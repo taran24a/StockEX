@@ -2,7 +2,7 @@ import bcrypt from "bcrypt";
 import { RegisterRequestSchema } from "@tradewise/shared";
 import { createDatabasePool } from "./pool.js";
 import { withTransaction } from "./transaction.js";
-import { loadEnvironment } from "../config.js";
+import { loadEnvironment } from "../config/index.js";
 
 const environment = loadEnvironment();
 const input = RegisterRequestSchema.safeParse({

@@ -6,9 +6,10 @@ import {
   TradeSchema,
   TradeQuerySchema
 } from "@tradewise/shared";
+import type { TradeQuery } from "@tradewise/shared";
 import type { Pool } from "pg";
-import { ApiError } from "../errors.js";
-import { validateQuery } from "../http-validation.js";
+import { ApiError } from "../services/errors.js";
+import { validatedQuery, validateQuery } from "../http-validation.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { databaseInteger, safeProduct } from "../db/values.js";
 import { fetchQuotes } from "../market/feed-client.js";
@@ -94,9 +95,9 @@ export function createPortfolioRouter(pool: Pool, secret: string, feedUrl: strin
     }));
   });
 
-  router.get("/trades", requireAuth, async (request, response) => {
+  router.get("/trades", requireAuth, validateQuery(TradeQuerySchema), async (request, response) => {
     // SYLLABUS: route/query params
-    const { limit, offset } = validateQuery(TradeQuerySchema, request);
+    const { limit, offset } = validatedQuery<TradeQuery>(response);
     const result = await pool.query<TradeRow>(
       `SELECT id, symbol, side, quantity, price_paise, total_paise, created_at
        FROM trades

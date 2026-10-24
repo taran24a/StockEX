@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { runner } from "node-pg-migrate";
-import { loadEnvironment } from "../config.js";
+import { loadEnvironment } from "../config/index.js";
 import { logger } from "../logger.js";
 
 const environment = loadEnvironment();

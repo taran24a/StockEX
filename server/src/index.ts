@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { createApp } from "./app.js";
-import { loadEnvironment } from "./config.js";
+import { loadEnvironment } from "./config/index.js";
 import { createDatabasePool } from "./db/pool.js";
 import { logger } from "./logger.js";
 import { attachQuoteStream } from "./market/quote-stream.js";

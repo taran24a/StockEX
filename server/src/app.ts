@@ -1,11 +1,15 @@
 import express from "express";
+import cors from "cors";
 import { HealthResponseSchema } from "@tradewise/shared";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import swaggerUi from "swagger-ui-express";
 import { errorHandler } from "./middleware/error-handler.js";
+import { requestIdMiddleware } from "./middleware/request-id.js";
+import { sanitizeRequest } from "./middleware/sanitize-request.js";
 import type { Pool } from "pg";
-import type { Environment } from "./config.js";
-import { ApiError } from "./errors.js";
+import type { Environment } from "./config/index.js";
+import { ForbiddenError, NotFoundError, TooManyRequestsError } from "./services/errors.js";
 import { createAuthRouter } from "./routes/auth.js";
 import { createOrdersRouter } from "./routes/orders.js";
 import { createPortfolioRouter } from "./routes/portfolio.js";
@@ -22,8 +26,31 @@ export interface AppDependencies {
 export function createApp(dependencies?: AppDependencies): express.Express {
   const app = express();
   app.disable("x-powered-by");
+  app.use(requestIdMiddleware);
+  app.use(helmet());
+  app.use(cors({
+    origin(origin, callback) {
+      if (origin === undefined) {
+        callback(null, false);
+      } else if (dependencies !== undefined && origin === dependencies.environment.CLIENT_ORIGIN) {
+        callback(null, origin);
+      } else {
+        callback(new ForbiddenError("This origin is not allowed", "ORIGIN_NOT_ALLOWED"));
+      }
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
+    credentials: true
+  }));
+  app.use(rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    handler: (_request, _response, next) => next(new TooManyRequestsError())
+  }));
   app.use(express.json({ limit: "32kb" }));
-  app.use(rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }));
+  app.use(sanitizeRequest);
 
   const healthHandler: express.RequestHandler = (_request, response) => {
     const health = HealthResponseSchema.parse({ status: "ok" });
@@ -90,27 +117,15 @@ export function createApp(dependencies?: AppDependencies): express.Express {
 
   if (dependencies !== undefined) {
     const { pool, environment, objectStorage } = dependencies;
-    app.use((request, response, next) => {
-      const origin = request.header("origin");
-      if (origin !== undefined && origin !== environment.CLIENT_ORIGIN) {
-        next(new ApiError(403, "ORIGIN_NOT_ALLOWED", "This origin is not allowed"));
-        return;
-      }
-      if (origin !== undefined) {
-        response.setHeader("Access-Control-Allow-Origin", origin);
-        response.setHeader("Vary", "Origin");
-        response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      }
-      if (request.method === "OPTIONS") {
-        response.sendStatus(204);
-        return;
-      }
-      next();
-    });
     app.use(
       "/api/auth",
-      rateLimit({ windowMs: 15 * 60_000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false })
+      rateLimit({
+        windowMs: 15 * 60_000,
+        limit: 20,
+        standardHeaders: "draft-8",
+        legacyHeaders: false,
+        handler: (_request, _response, next) => next(new TooManyRequestsError())
+      })
     );
     app.use("/api/auth", createAuthRouter(pool, environment, objectStorage));
     app.use("/api/admin", createAdminRouter(pool, environment.JWT_SECRET));
@@ -120,7 +135,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
   }
 
   app.use((_request, _response, next) => {
-    next(new ApiError(404, "NOT_FOUND", "The requested resource was not found"));
+    next(new NotFoundError());
   });
   app.use(errorHandler);
 

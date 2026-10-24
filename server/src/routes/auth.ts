@@ -14,10 +14,11 @@ import {
   RegisterRequestSchema,
   UserSchema
 } from "@tradewise/shared";
+import type { LoginRequest, RegisterRequest } from "@tradewise/shared";
 import type { Pool } from "pg";
-import type { Environment } from "../config.js";
-import { ApiError } from "../errors.js";
-import { validateBody } from "../http-validation.js";
+import type { Environment } from "../config/index.js";
+import { ApiError } from "../services/errors.js";
+import { validatedBody, validateBody } from "../http-validation.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { withTransaction } from "../db/transaction.js";
 import { logger } from "../logger.js";
@@ -87,9 +88,9 @@ export function createAuthRouter(pool: Pool, environment: Environment, objectSto
   const router = Router();
   const requireAuth = authenticate(environment.JWT_SECRET);
 
-  router.post("/register", async (request, response) => {
+  router.post("/register", validateBody(RegisterRequestSchema), async (_request, response) => {
     // SYLLABUS: validation
-    const input = validateBody(RegisterRequestSchema, request.body);
+    const input = validatedBody<RegisterRequest>(response);
     // SYLLABUS: sanitization
     const displayName = xss(input.displayName, {
       whiteList: {},
@@ -126,8 +127,8 @@ export function createAuthRouter(pool: Pool, environment: Environment, objectSto
     }
   });
 
-  router.post("/login", async (request, response) => {
-    const input = validateBody(LoginRequestSchema, request.body);
+  router.post("/login", validateBody(LoginRequestSchema), async (_request, response) => {
+    const input = validatedBody<LoginRequest>(response);
     const result = await pool.query<UserRow>(
       `SELECT id, email, display_name, password_hash, role
        FROM users

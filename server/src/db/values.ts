@@ -1,4 +1,4 @@
-import { ApiError } from "../errors.js";
+import { ApiError } from "../services/errors.js";
 
 export function databaseInteger(value: string | number, field: string): number {
   const parsed = typeof value === "number" ? value : Number(value);

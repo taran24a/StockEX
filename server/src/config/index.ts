@@ -1,11 +1,12 @@
 import dotenv from "dotenv";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
 // SYLLABUS: fs/path and process/globals
-dotenv.config({ path: process.env.DOTENV_CONFIG_PATH ?? resolve(process.cwd(), "../.env") });
+const repositoryEnvironmentFile = fileURLToPath(new URL("../../../.env", import.meta.url));
+dotenv.config({ path: process.env.DOTENV_CONFIG_PATH ?? repositoryEnvironmentFile });
 
-const EnvironmentSchema = z.object({
+export const EnvironmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   DATABASE_URL: z.string().url().default("postgres://tradewise:tradewise@localhost:5432/tradewise"),
@@ -17,7 +18,8 @@ const EnvironmentSchema = z.object({
   MINIO_USE_SSL: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),
   MINIO_ACCESS_KEY: z.string().default("tradewise"),
   MINIO_SECRET_KEY: z.string().min(8).default("tradewise-local"),
-  MINIO_BUCKET: z.string().default("tradewise-uploads")
+  MINIO_BUCKET: z.string().default("tradewise-uploads"),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info")
 });
 
 export type Environment = z.infer<typeof EnvironmentSchema>;

@@ -1,5 +1,5 @@
 import * as Minio from "minio";
-import type { Environment } from "./config.js";
+import type { Environment } from "./config/index.js";
 
 export function createObjectStorage(environment: Environment): Minio.Client {
   // SYLLABUS: MinIO

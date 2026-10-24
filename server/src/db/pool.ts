@@ -1,5 +1,5 @@
 import pg from "pg";
-import type { Environment } from "../config.js";
+import type { Environment } from "../config/index.js";
 
 const { Pool } = pg;
 

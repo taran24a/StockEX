@@ -2,10 +2,11 @@ import type { ErrorRequestHandler } from "express";
 import multer from "multer";
 import { ErrorResponseSchema } from "@tradewise/shared";
 import { logger } from "../logger.js";
-import { ApiError } from "../errors.js";
+import { ApiError, AppError } from "../services/errors.js";
 
 // SYLLABUS: error middleware
 export const errorHandler: ErrorRequestHandler = (error: unknown, request, response, _next) => {
+  const requestLogger = response.locals.logger ?? logger;
   if (error instanceof multer.MulterError) {
     const isTooLarge = error.code === "LIMIT_FILE_SIZE";
     const uploadError = new ApiError(
@@ -18,7 +19,7 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, request, respo
     }));
     return;
   }
-  const apiError = error instanceof ApiError
+  const apiError = error instanceof AppError
     ? error
     : error instanceof Error && "status" in error && error.status === 404
       ? new ApiError(404, "NOT_FOUND", "The requested resource was not found")
@@ -27,14 +28,15 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, request, respo
       : undefined;
 
   if (apiError === undefined) {
-    logger.error({ err: error, path: request.path }, "Unhandled request error");
+    requestLogger.error({ err: error, path: request.path }, "Unhandled request error");
   }
 
   const status = apiError?.status ?? 500;
   const body = ErrorResponseSchema.parse({
     error: {
       code: apiError?.code ?? "INTERNAL_ERROR",
-      message: apiError?.message ?? "An unexpected error occurred"
+      message: apiError?.message ?? "An unexpected error occurred",
+      ...(apiError?.details === undefined ? {} : { details: apiError.details })
     }
   });
   response.status(status).json(body);
