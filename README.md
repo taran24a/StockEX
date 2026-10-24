@@ -23,7 +23,7 @@ npm run dev
 
 Open <http://localhost:5173>. The API listens on port 3000, the synthetic feed on 4000, PostgreSQL on 5432, and MinIO on 9000 (console: 9001). The API creates its upload bucket when it starts, so wait for MinIO to become ready first.
 
-The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scripts include `dev`, `build`, `test`, `lint`, `seed`, `repl`, `migrate:up`, and `migrate:down`. Migration 002 adds accounts, instruments, candles, fills, ledger, events, risk, and watchlist tables while preserving existing API tables and data. `npm run migrate:down` rolls back one migration and drops its new trading-domain tables. Set `SEED_EMAIL`, `SEED_DISPLAY_NAME`, and `SEED_PASSWORD` in `.env` before running `npm run seed`; the command creates one regular local account and preserves credentials if that email already exists.
+The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scripts include `dev`, `build`, `test`, `lint`, `seed`, `repl`, `migrate:up`, `migrate:down`, `candles:generate`, and `candles:import`. `npm run dev` runs the API, client, and separate synthetic feed process. Migration 002 adds accounts, instruments, candles, fills, ledger, events, risk, and watchlist tables while preserving existing API tables and data. `npm run migrate:down` rolls back one migration and drops its new trading-domain tables.
 
 New accounts receive **100,000,000 paise (₹1,000,000)** in virtual cash. Local credentials in `.env.server.example` are for development only; set a unique `JWT_SECRET` and service credentials before deployment. Keep `.env` out of version control.
 
@@ -42,7 +42,7 @@ npm run build
 Invoke-RestMethod http://localhost:3000/api/v1/health
 ```
 
-Use `npm run migrate:up` to apply pending migrations and `npm run migrate:down` to revert the latest migration.
+Use `npm run migrate:up` to apply pending migrations and `npm run migrate:down` to revert the latest migration. Generate a 90-day CSV with `npm run candles:generate`; import it with `npm run candles:import -- C:\path\to\candles.csv`. The importer streams rows and can be rerun safely.
 
 Interactive API documentation is at <http://localhost:3000/api/docs>.
 
@@ -52,6 +52,8 @@ Interactive API documentation is at <http://localhost:3000/api/docs>.
 - `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, `POST /api/v1/auth/logout`
 - `POST /api/v1/auth/me/avatar` (JPEG, PNG, or WebP; 2 MB maximum; stored in MinIO)
 - `GET /api/quotes` and `GET /api/quotes/ws`
+- `GET /api/market/quotes`, `GET /api/market/:symbol`, `GET /api/market/:symbol/candles`
+- Authenticated watchlist CRUD at `/api/watchlists`, including instrument add/remove routes
 - `GET /api/wallet`, `GET /api/portfolio`
 - `POST /api/orders`, `GET /api/orders`, `GET /api/trades`
 - `GET /api/admin/users` (admin role only)
@@ -62,4 +64,4 @@ Authenticated endpoints require a bearer token in the `Authorization` header. Re
 
 Requests and responses use Zod schemas exported from `shared/`. Order execution is a pure TypeScript matching function; PostgreSQL transactions lock and update the wallet/position together with the order and trade records. Paise values remain safe integers in application code and are stored as `NUMERIC(20,0)` in PostgreSQL.
 
-The synthetic feed exposes quotes over HTTP and WebSocket at port 4000. API clients can subscribe to its validated updates at `/api/quotes/ws`. No market prices are embedded in the React client.
+The synthetic feed exposes `/prices`, `/quotes`, and WebSocket `/ws` at port 4000. API clients can subscribe to its validated updates at `/api/quotes/ws`. Fifteen fictional instruments are seeded across five sectors. No market prices are embedded in the React client.

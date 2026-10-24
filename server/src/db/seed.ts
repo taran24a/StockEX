@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { createDatabasePool } from "./pool.js";
 import { withTransaction } from "./transaction.js";
 import { loadEnvironment } from "../config/index.js";
+import { marketInstruments } from "../feed/market.js";
 
 const environment = loadEnvironment();
 const pool = createDatabasePool(environment);
@@ -12,6 +13,16 @@ const seedUsers = [
 
 try {
   await withTransaction(pool, async (client) => {
+    for (const instrument of marketInstruments) {
+      await client.query(
+        `INSERT INTO instruments (symbol, name, sector, tick_size, last_price)
+         VALUES ($1, $2, $3, 1, $4)
+         ON CONFLICT (symbol) DO UPDATE
+         SET name = EXCLUDED.name, sector = EXCLUDED.sector, tick_size = EXCLUDED.tick_size`,
+        [instrument.symbol, instrument.name, instrument.sector, instrument.initialPricePaise]
+      );
+    }
+
     for (const seedUser of seedUsers) {
       const passwordHash = await bcrypt.hash(seedUser.password, 12);
       const inserted = await client.query<{ id: string }>(

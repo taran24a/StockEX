@@ -11,7 +11,7 @@
     "node": ">=20.19"
   },
   "scripts": {
-    "dev": "npm run build --workspace @tradewise/shared && concurrently -k -n API,WEB \"npm run dev --workspace @tradewise/server\" \"npm run dev --workspace @tradewise/client\"",
+    "dev": "npm run build --workspace @tradewise/shared && concurrently -k -n API,WEB,FEED \"npm run dev --workspace @tradewise/server\" \"npm run dev --workspace @tradewise/client\" \"npm run dev:feed --workspace @tradewise/server\"",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
@@ -25,7 +25,9 @@
     "dev:server": "npm run build --workspace @tradewise/shared && npm run dev --workspace @tradewise/server",
     "dev:feed": "npm run build --workspace @tradewise/shared && npm run dev:feed --workspace @tradewise/server",
     "dev:client": "npm run build --workspace @tradewise/shared && npm run dev --workspace @tradewise/client",
-    "migrate": "npm run build --workspace @tradewise/shared && npm run migrate --workspace @tradewise/server"
+    "migrate": "npm run build --workspace @tradewise/shared && npm run migrate --workspace @tradewise/server",
+    "candles:generate": "npm run candles:generate --workspace @tradewise/server",
+    "candles:import": "npm run candles:import --workspace @tradewise/server"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

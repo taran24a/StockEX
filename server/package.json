@@ -15,6 +15,8 @@
     "migrate:up": "node --import tsx src/db/migrate.ts up",
     "migrate:down": "node --import tsx src/db/migrate.ts down",
     "seed": "node --import tsx src/db/seed.ts",
+    "candles:generate": "node --import tsx src/db/generate-candles.ts",
+    "candles:import": "node --import tsx src/db/import-candles.ts",
     "repl": "node --import tsx --experimental-repl-await"
   },
   "dependencies": {

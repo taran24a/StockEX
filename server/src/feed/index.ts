@@ -1,24 +1,37 @@
-import express from "express";
 import { createServer } from "node:http";
-import { WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { HealthResponseSchema, QuotesResponseSchema } from "@tradewise/shared";
 import { advanceQuotes, initialQuotes } from "./market.js";
 
-const app = express();
-app.disable("x-powered-by");
 let quotes = initialQuotes();
-
-app.get("/health", (_request, response) => {
-  response.json(HealthResponseSchema.parse({ status: "ok" }));
-});
-
-app.get("/quotes", (_request, response) => {
-  response.json(QuotesResponseSchema.parse({ quotes }));
+const server = createServer((request, response) => {
+  const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+  if (request.method === "GET" && pathname === "/health") {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify(HealthResponseSchema.parse({ status: "ok" })));
+    return;
+  }
+  if (request.method === "GET" && (pathname === "/prices" || pathname === "/quotes")) {
+    response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    response.end(JSON.stringify(QuotesResponseSchema.parse({ quotes })));
+    return;
+  }
+  response.writeHead(404, { "Content-Type": "application/json" });
+  response.end(JSON.stringify({ error: { code: "NOT_FOUND", message: "Feed route not found" } }));
 });
 
 // SYLLABUS: raw http
-const server = createServer(app);
-const websocketServer = new WebSocketServer({ server, path: "/ws" });
+const websocketServer = new WebSocketServer({ noServer: true });
+server.on("upgrade", (request, socket, head) => {
+  const pathname = new URL(request.url ?? "/", "http://localhost").pathname;
+  if (pathname !== "/ws") {
+    socket.destroy();
+    return;
+  }
+  websocketServer.handleUpgrade(request, socket, head, (client) => {
+    websocketServer.emit("connection", client, request);
+  });
+});
 
 // SYLLABUS: EventEmitter
 websocketServer.on("connection", (socket) => {
@@ -30,7 +43,7 @@ const timer = setInterval(() => {
   quotes = advanceQuotes(quotes);
   const update = JSON.stringify(QuotesResponseSchema.parse({ quotes }));
   for (const socket of websocketServer.clients) {
-    if (socket.readyState === socket.OPEN) {
+    if (socket.readyState === WebSocket.OPEN) {
       socket.send(update);
     }
   }
@@ -47,6 +60,9 @@ server.listen(port, () => {
 
 function shutdown(): void {
   clearInterval(timer);
+  for (const socket of websocketServer.clients) {
+    socket.close(1001, "Feed shutting down");
+  }
   websocketServer.close();
   server.close();
 }

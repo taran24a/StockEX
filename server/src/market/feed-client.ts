@@ -1,14 +1,13 @@
 import { QuotesResponseSchema } from "@tradewise/shared";
+import type { Quote } from "@tradewise/shared";
 import { logger } from "../logger.js";
 import { ApiError } from "../services/errors.js";
 
-export async function fetchQuotes(feedUrl: string) {
+async function fetchFeedQuotes(feedUrl: string, path: "/quotes" | "/prices"): Promise<Quote[]> {
   let response: Response;
   try {
     // SYLLABUS: fetch/async-await
-    response = await fetch(new URL("/quotes", feedUrl), {
-      signal: AbortSignal.timeout(3_000)
-    });
+    response = await fetch(new URL(path, feedUrl), { signal: AbortSignal.timeout(3_000) });
   } catch (error) {
     logger.error({ err: error }, "Market feed request failed");
     throw new ApiError(503, "MARKET_FEED_UNAVAILABLE", "Market quotes are temporarily unavailable");
@@ -23,4 +22,12 @@ export async function fetchQuotes(feedUrl: string) {
     throw new ApiError(502, "INVALID_MARKET_FEED_RESPONSE", "Market feed returned invalid quote data");
   }
   return parsed.data.quotes;
+}
+
+export function fetchQuotes(feedUrl: string): Promise<Quote[]> {
+  return fetchFeedQuotes(feedUrl, "/quotes");
+}
+
+export function fetchMarketPrices(feedUrl: string): Promise<Quote[]> {
+  return fetchFeedQuotes(feedUrl, "/prices");
 }

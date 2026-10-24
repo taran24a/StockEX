@@ -86,6 +86,43 @@ export const CandleSchema = z.object({
   { message: "Candle OHLC values are inconsistent" }
 );
 
+export const CandlesQuerySchema = z.object({
+  interval: z.enum(["1m", "5m", "15m", "1h", "4h", "1d"]).default("1d"),
+  limit: z.coerce.number().int().min(1).max(1000).default(100)
+});
+export const CandlesResponseSchema = z.object({
+  candles: z.array(CandleSchema)
+});
+
+export const MarketInstrumentResponseSchema = z.object({
+  instrument: InstrumentSchema,
+  quote: QuoteSchema.nullable()
+});
+
+export const WatchlistSchema = z.object({
+  id: z.uuid(),
+  name: z.string().trim().min(1).max(80),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime()
+});
+
+export const WatchlistDetailSchema = WatchlistSchema.extend({
+  instruments: z.array(z.object({
+    symbol: symbolSchema,
+    name: z.string().min(1),
+    pricePaise: positivePaiseSchema
+  }))
+});
+
+export const CreateWatchlistRequestSchema = z.object({
+  name: z.string().trim().min(1).max(80)
+});
+
+export const UpdateWatchlistRequestSchema = CreateWatchlistRequestSchema;
+export const WatchlistsResponseSchema = z.object({
+  watchlists: z.array(WatchlistDetailSchema)
+});
+
 export const OrderSideSchema = z.enum(["buy", "sell"]);
 export const OrderTypeSchema = z.enum(["market", "limit"]);
 export const OrderStatusSchema = z.enum([
@@ -320,6 +357,13 @@ export type Instrument = z.infer<typeof QuoteSchema>;
 export type Quote = z.infer<typeof QuoteSchema>;
 export type QuotesResponse = z.infer<typeof QuotesResponseSchema>;
 export type Candle = z.infer<typeof CandleSchema>;
+export type CandlesQuery = z.infer<typeof CandlesQuerySchema>;
+export type CandlesResponse = z.infer<typeof CandlesResponseSchema>;
+export type MarketInstrumentResponse = z.infer<typeof MarketInstrumentResponseSchema>;
+export type Watchlist = z.infer<typeof WatchlistSchema>;
+export type WatchlistDetail = z.infer<typeof WatchlistDetailSchema>;
+export type CreateWatchlistRequest = z.infer<typeof CreateWatchlistRequestSchema>;
+export type WatchlistsResponse = z.infer<typeof WatchlistsResponseSchema>;
 export type OrderSide = z.infer<typeof OrderSideSchema>;
 export type OrderType = z.infer<typeof OrderTypeSchema>;
 export type OrderRequest = z.infer<typeof OrderRequestSchema>;

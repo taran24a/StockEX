@@ -15,6 +15,8 @@ import { createOrdersRouter } from "./routes/orders.js";
 import { createPortfolioRouter } from "./routes/portfolio.js";
 import { createQuotesRouter } from "./routes/quotes.js";
 import { createAdminRouter } from "./routes/admin.js";
+import { createMarketRouter } from "./routes/market.js";
+import { createWatchlistsRouter } from "./routes/watchlists.js";
 import type { Client as MinioClient } from "minio";
 
 export interface AppDependencies {
@@ -38,7 +40,7 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         callback(new ForbiddenError("This origin is not allowed", "ORIGIN_NOT_ALLOWED"));
       }
     },
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
     credentials: true
   }));
@@ -97,6 +99,24 @@ export function createApp(dependencies?: AppDependencies): express.Express {
         "/api/quotes": {
           get: { summary: "Get synthetic market quotes", responses: { "200": { description: "Current quotes" } } }
         },
+        "/api/market/quotes": {
+          get: { summary: "Get current market quotes", responses: { "200": { description: "Current quotes" } } }
+        },
+        "/api/market/{symbol}": {
+          get: { summary: "Get instrument details and quote", responses: { "200": { description: "Instrument and quote" } } }
+        },
+        "/api/market/{symbol}/candles": {
+          get: { summary: "Get aggregated historical candles", responses: { "200": { description: "Candles" } } }
+        },
+        "/api/watchlists": {
+          get: { summary: "List owned watchlists", responses: { "200": { description: "Watchlists" } } },
+          post: { summary: "Create a watchlist", responses: { "201": { description: "Watchlist created" } } }
+        },
+        "/api/watchlists/{watchlistId}": {
+          get: { summary: "Get an owned watchlist", responses: { "200": { description: "Watchlist" } } },
+          patch: { summary: "Rename an owned watchlist", responses: { "200": { description: "Watchlist updated" } } },
+          delete: { summary: "Delete an owned watchlist", responses: { "204": { description: "Watchlist deleted" } } }
+        },
         "/api/orders": {
           get: { summary: "List filled paper orders", responses: { "200": { description: "Orders" } } },
           post: { summary: "Place a paper market order", responses: { "201": { description: "Filled order" } } }
@@ -134,6 +154,8 @@ export function createApp(dependencies?: AppDependencies): express.Express {
     app.use("/api/v1/auth", authRouter);
     app.use("/api/auth", authRouter);
     app.use("/api/admin", createAdminRouter(pool, environment.JWT_SECRET));
+    app.use("/api/market", createMarketRouter(pool, environment.MOCK_FEED_URL));
+    app.use("/api/watchlists", createWatchlistsRouter(pool, environment.JWT_SECRET));
     app.use("/api/quotes", createQuotesRouter(environment.MOCK_FEED_URL));
     app.use("/api", createPortfolioRouter(pool, environment.JWT_SECRET, environment.MOCK_FEED_URL));
     app.use("/api", createOrdersRouter(pool, environment.JWT_SECRET, environment.MOCK_FEED_URL));
