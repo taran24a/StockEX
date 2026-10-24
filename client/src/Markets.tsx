@@ -301,12 +301,6 @@ export function OrderTicket({
     return () => document.removeEventListener("keydown", handleShortcut);
   }, []);
 
-  useEffect(() => {
-    if (quote !== null && type === "limit") {
-      setLimitPrice(formatRupeeInput(quote.pricePaise));
-    }
-  }, [quote?.pricePaise, type]);
-
   const portfolio = useQuery({
     queryKey: ["portfolio"],
     queryFn: () => apiRequest("/api/v1/portfolio", AccountPortfolioResponseSchema, token ?? undefined),
@@ -375,7 +369,16 @@ export function OrderTicket({
         </div>
         <div aria-label="Order type" className="market-toggle-pair market-type-toggle" role="group">
           <button aria-pressed={type === "market"} onClick={() => setType("market")} type="button">MARKET</button>
-          <button aria-pressed={type === "limit"} onClick={() => setType("limit")} type="button">LIMIT</button>
+          <button
+            aria-pressed={type === "limit"}
+            onClick={() => {
+              if (quote !== null) {
+                setLimitPrice(formatRupeeInput(quote.pricePaise));
+              }
+              setType("limit");
+            }}
+            type="button"
+          >LIMIT</button>
         </div>
         <label className="market-ticket-field">
           Quantity
