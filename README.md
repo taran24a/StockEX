@@ -27,6 +27,12 @@ The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scr
 
 New accounts receive **100,000,000 paise (₹1,000,000)** in virtual cash. Local credentials in `.env.server.example` are for development only; set a unique `JWT_SECRET` and service credentials before deployment. Keep `.env` out of version control.
 
+### PostgreSQL password troubleshooting
+
+`password authentication failed` means PostgreSQL rejected the user/password in `DATABASE_URL`; the migration has not run yet. Ensure `DATABASE_URL` uses the same username, password, and database as `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` in the root `.env`. The checked-in examples use matching local-only defaults.
+
+Compose initializes a database user's password only when its data volume is first created. If you changed `POSTGRES_PASSWORD` after the volume already existed, update the database role password using an existing working database administrator login, or set `DATABASE_URL` to the password already stored in that database. Do not remove the Postgres volume just to fix credentials if it contains data. If the password contains URL-special characters, percent-encode it in `DATABASE_URL`.
+
 ## Useful commands
 
 ```powershell

@@ -324,9 +324,9 @@ export async function down(pgm: MigrationBuilder): Promise<void> {
   pgm.dropTable("candles");
   pgm.dropConstraint("orders", "orders_status_check");
   pgm.addConstraint("orders", "orders_status_check", { check: "status = 'filled'" });
-  pgm.dropIndex("orders", "orders_instrument_created_at_idx");
-  pgm.dropIndex("orders", "orders_account_status_created_at_idx");
-  pgm.dropIndex("orders", "orders_account_created_at_idx");
+  pgm.dropIndex("orders", ["instrument_id", "created_at"], { name: "orders_instrument_created_at_idx" });
+  pgm.dropIndex("orders", ["account_id", "status", "created_at"], { name: "orders_account_status_created_at_idx" });
+  pgm.dropIndex("orders", ["account_id", "created_at"], { name: "orders_account_created_at_idx" });
   pgm.dropConstraint("orders", "orders_account_idempotency_key_unique");
   pgm.dropConstraint("orders", "orders_filled_quantity_lte_quantity");
   pgm.dropConstraint("orders", "orders_limit_price_required_for_limit");
@@ -338,7 +338,7 @@ export async function down(pgm: MigrationBuilder): Promise<void> {
     "filled_quantity",
     "idempotency_key"
   ]);
-  pgm.dropIndex("positions", "positions_account_instrument_idx");
+  pgm.dropIndex("positions", ["account_id", "instrument_id"], { name: "positions_account_instrument_idx" });
   pgm.dropConstraint("positions", "positions_account_instrument_unique");
   pgm.dropColumns("positions", ["account_id", "instrument_id", "avg_cost"]);
   pgm.dropTable("instruments");

@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 const paiseSchema = z.number().int().nonnegative().safe();
+const positivePaiseSchema = z.number().int().positive().safe();
+const symbolSchema = z.string().regex(/^[A-Z][A-Z0-9.-]{0,31}$/);
+const quantitySchema = z.number().int().positive().safe();
 
 export const HealthResponseSchema = z.object({
   status: z.literal("ok")
@@ -42,31 +45,119 @@ export const AuthResponseSchema = z.object({
 });
 
 export const InstrumentSchema = z.object({
+  id: z.uuid(),
+  symbol: symbolSchema,
+  name: z.string().trim().min(1).max(120),
+  sector: z.string().trim().min(1).max(80),
+  tickSizePaise: positivePaiseSchema,
+  lastPricePaise: positivePaiseSchema,
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime()
+});
+
+export const QuoteSchema = z.object({
   symbol: z.string().regex(/^[A-Z][A-Z0-9.-]{0,11}$/),
   name: z.string().min(1),
-  pricePaise: paiseSchema,
+  pricePaise: positivePaiseSchema,
   changePaise: z.number().int().safe(),
   updatedAt: z.iso.datetime()
 });
 
 export const QuotesResponseSchema = z.object({
-  quotes: z.array(InstrumentSchema)
+  quotes: z.array(QuoteSchema)
 });
+
+export const CandleSchema = z.object({
+  instrumentId: z.uuid(),
+  ts: z.iso.datetime(),
+  openPaise: positivePaiseSchema,
+  highPaise: positivePaiseSchema,
+  lowPaise: positivePaiseSchema,
+  closePaise: positivePaiseSchema,
+  volume: z.number().int().nonnegative().safe()
+}).refine(
+  ({ openPaise, highPaise, lowPaise, closePaise }) =>
+    highPaise >= lowPaise &&
+    highPaise >= openPaise &&
+    highPaise >= closePaise &&
+    lowPaise <= openPaise &&
+    lowPaise <= closePaise,
+  { message: "Candle OHLC values are inconsistent" }
+);
+
+export const OrderSideSchema = z.enum(["buy", "sell"]);
+export const OrderTypeSchema = z.enum(["market", "limit"]);
+export const OrderStatusSchema = z.enum([
+  "pending",
+  "open",
+  "partially_filled",
+  "filled",
+  "cancelled",
+  "rejected"
+]);
+
+export type OrderStatus = z.infer<typeof OrderStatusSchema>;
+
+export const OrderStatusTransitions = {
+  pending: ["open", "cancelled", "rejected"],
+  open: ["partially_filled", "filled", "cancelled", "rejected"],
+  partially_filled: ["filled", "cancelled"],
+  filled: [],
+  cancelled: [],
+  rejected: []
+} as const satisfies Readonly<Record<OrderStatus, readonly OrderStatus[]>>;
+
+export function canTransitionOrderStatus(from: OrderStatus, to: OrderStatus): boolean {
+  return OrderStatusTransitions[from].some((status) => status === to);
+}
+
+export const OrderRequestSchema = z.discriminatedUnion("type", [
+  z.object({
+    symbol: symbolSchema,
+    side: OrderSideSchema,
+    type: z.literal("market"),
+    quantity: quantitySchema,
+    idempotencyKey: z.string().trim().min(1).max(128).optional()
+  }),
+  z.object({
+    symbol: symbolSchema,
+    side: OrderSideSchema,
+    type: z.literal("limit"),
+    quantity: quantitySchema,
+    limitPricePaise: positivePaiseSchema,
+    idempotencyKey: z.string().trim().min(1).max(128).optional()
+  })
+]);
 
 export const PlaceOrderRequestSchema = z.object({
   symbol: z.string().regex(/^[A-Z][A-Z0-9.-]{0,11}$/),
-  side: z.enum(["buy", "sell"]),
-  quantity: z.number().int().positive().safe()
+  side: OrderSideSchema,
+  quantity: quantitySchema
 });
 
 export const OrderSchema = z.object({
   id: z.uuid(),
   symbol: z.string(),
-  side: z.enum(["buy", "sell"]),
-  quantity: z.number().int().positive().safe(),
+  side: OrderSideSchema,
+  quantity: quantitySchema,
   pricePaise: paiseSchema,
   totalPaise: paiseSchema,
-  status: z.literal("filled"),
+  status: OrderStatusSchema,
+  createdAt: z.iso.datetime()
+});
+
+export const OrderResponseSchema = z.object({
+  id: z.uuid(),
+  accountId: z.uuid(),
+  instrumentId: z.uuid(),
+  symbol: symbolSchema,
+  side: OrderSideSchema,
+  type: OrderTypeSchema,
+  quantity: quantitySchema,
+  limitPricePaise: positivePaiseSchema.nullable(),
+  filledQuantity: z.number().int().nonnegative().safe(),
+  status: OrderStatusSchema,
+  idempotencyKey: z.string().max(128).nullable(),
   createdAt: z.iso.datetime()
 });
 
@@ -90,9 +181,86 @@ export const PositionSchema = z.object({
   profitLossPaise: z.number().int().safe()
 });
 
+export const PortfolioPositionSchema = z.object({
+  accountId: z.uuid(),
+  instrumentId: z.uuid(),
+  symbol: symbolSchema,
+  quantity: quantitySchema,
+  averageCostPaise: paiseSchema
+});
+
 export const PortfolioResponseSchema = z.object({
   balancePaise: paiseSchema,
   positions: z.array(PositionSchema)
+});
+
+export const PortfolioSchema = z.object({
+  accountId: z.uuid(),
+  cashBalancePaise: paiseSchema,
+  reservedBalancePaise: paiseSchema,
+  positions: z.array(PortfolioPositionSchema)
+});
+
+export const FillSchema = z.object({
+  id: z.uuid(),
+  orderId: z.uuid(),
+  counterOrderId: z.uuid().nullable(),
+  pricePaise: positivePaiseSchema,
+  quantity: quantitySchema,
+  feePaise: paiseSchema,
+  executedAt: z.iso.datetime()
+});
+
+export const LedgerEntryTypeSchema = z.enum([
+  "deposit",
+  "withdrawal",
+  "reserve",
+  "release",
+  "trade_debit",
+  "trade_credit",
+  "fee"
+]);
+
+export const LedgerEntrySchema = z.object({
+  id: z.uuid(),
+  accountId: z.uuid(),
+  fillId: z.uuid().nullable(),
+  entryType: LedgerEntryTypeSchema,
+  amountPaise: z.number().int().safe().refine((value) => value !== 0),
+  balanceAfterPaise: paiseSchema,
+  createdAt: z.iso.datetime()
+});
+
+export const RiskRulesSchema = z.object({
+  accountId: z.uuid(),
+  maxOrderNotionalPaise: positivePaiseSchema,
+  maxConcentrationPct: z.number().positive().max(100).multipleOf(0.01),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime()
+});
+
+export const RiskAlertSchema = z.object({
+  id: z.uuid(),
+  accountId: z.uuid(),
+  ruleId: z.uuid().nullable(),
+  orderId: z.uuid().nullable(),
+  alertType: z.string().trim().min(1).max(64),
+  severity: z.enum(["info", "warning", "critical"]),
+  message: z.string().min(1),
+  details: z.record(z.string(), z.unknown()),
+  acknowledgedAt: z.iso.datetime().nullable(),
+  createdAt: z.iso.datetime()
+});
+
+export const DomainEventSchema = z.object({
+  id: z.uuid(),
+  aggregateType: z.string().trim().min(1).max(64),
+  aggregateId: z.uuid(),
+  eventType: z.string().trim().min(1).max(128),
+  sequenceNumber: z.number().int().positive().safe(),
+  payload: z.record(z.string(), z.unknown()),
+  requestId: z.uuid().nullable(),
+  createdAt: z.iso.datetime()
 });
 
 export const ProfileResponseSchema = z.object({
@@ -115,6 +283,8 @@ export const TradeQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0)
 });
 
+export const PaginationQuerySchema = TradeQuerySchema;
+
 export const TradeSchema = z.object({
   id: z.uuid(),
   symbol: z.string(),
@@ -132,7 +302,8 @@ export const TradesResponseSchema = z.object({
 export const ErrorResponseSchema = z.object({
   error: z.object({
     code: z.string(),
-    message: z.string()
+    message: z.string(),
+    details: z.unknown().optional()
   })
 });
 
@@ -143,19 +314,35 @@ export type User = z.infer<typeof UserSchema>;
 export type AdminUser = z.infer<typeof AdminUserSchema>;
 export type AdminUsersResponse = z.infer<typeof AdminUsersResponseSchema>;
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
-export type Instrument = z.infer<typeof InstrumentSchema>;
+export type InstrumentRecord = z.infer<typeof InstrumentSchema>;
+export type Instrument = z.infer<typeof QuoteSchema>;
+export type Quote = z.infer<typeof QuoteSchema>;
 export type QuotesResponse = z.infer<typeof QuotesResponseSchema>;
+export type Candle = z.infer<typeof CandleSchema>;
+export type OrderSide = z.infer<typeof OrderSideSchema>;
+export type OrderType = z.infer<typeof OrderTypeSchema>;
+export type OrderRequest = z.infer<typeof OrderRequestSchema>;
 export type PlaceOrderRequest = z.infer<typeof PlaceOrderRequestSchema>;
 export type Order = z.infer<typeof OrderSchema>;
+export type OrderResponse = z.infer<typeof OrderResponseSchema>;
 export type OrdersResponse = z.infer<typeof OrdersResponseSchema>;
 export type PlaceOrderResponse = z.infer<typeof PlaceOrderResponseSchema>;
 export type BalanceResponse = z.infer<typeof BalanceResponseSchema>;
 export type Position = z.infer<typeof PositionSchema>;
+export type PortfolioPosition = z.infer<typeof PortfolioPositionSchema>;
 export type PortfolioResponse = z.infer<typeof PortfolioResponseSchema>;
+export type Portfolio = z.infer<typeof PortfolioSchema>;
+export type Fill = z.infer<typeof FillSchema>;
+export type LedgerEntryType = z.infer<typeof LedgerEntryTypeSchema>;
+export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
+export type RiskRules = z.infer<typeof RiskRulesSchema>;
+export type RiskAlert = z.infer<typeof RiskAlertSchema>;
+export type DomainEvent = z.infer<typeof DomainEventSchema>;
 export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
 export type AvatarResponse = z.infer<typeof AvatarResponseSchema>;
 export type AvatarFileMetadata = z.infer<typeof AvatarFileMetadataSchema>;
 export type TradeQuery = z.infer<typeof TradeQuerySchema>;
+export type PaginationQuery = z.infer<typeof PaginationQuerySchema>;
 export type Trade = z.infer<typeof TradeSchema>;
 export type TradesResponse = z.infer<typeof TradesResponseSchema>;
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
