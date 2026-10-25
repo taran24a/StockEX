@@ -273,6 +273,18 @@ export const OrderResponseSchema = z.object({
   createdAt: z.iso.datetime()
 });
 
+export const V1OrderPlacementResponseSchema = z.object({
+  order: OrderResponseSchema,
+  fills: z.array(z.object({
+    id: z.uuid(),
+    symbol: symbolSchema,
+    makerOrderId: z.uuid(),
+    takerOrderId: z.uuid(),
+    pricePaise: positivePaiseSchema,
+    quantity: quantitySchema
+  }))
+});
+
 export const OrdersResponseSchema = z.object({
   orders: z.array(OrderSchema)
 });
@@ -750,6 +762,7 @@ export type OrderRequest = z.infer<typeof OrderRequestSchema>;
 export type PlaceOrderRequest = z.infer<typeof PlaceOrderRequestSchema>;
 export type Order = z.infer<typeof OrderSchema>;
 export type OrderResponse = z.infer<typeof OrderResponseSchema>;
+export type V1OrderPlacementResponse = z.infer<typeof V1OrderPlacementResponseSchema>;
 export type OrdersResponse = z.infer<typeof OrdersResponseSchema>;
 export type PlaceOrderResponse = z.infer<typeof PlaceOrderResponseSchema>;
 export type BalanceResponse = z.infer<typeof BalanceResponseSchema>;

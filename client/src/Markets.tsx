@@ -5,10 +5,10 @@ import {
   MarketDepthResponseSchema,
   MarketInstrumentsResponseSchema,
   OrderRequestSchema,
-  OrderResponseSchema,
   WatchlistDetailSchema,
   WatchlistsResponseSchema,
   QuotesResponseSchema,
+  V1OrderPlacementResponseSchema,
   type Candle,
   type MarketInstrumentResponse,
   type Quote,
@@ -336,7 +336,7 @@ export function OrderTicket({
         ...(type === "limit" && limitPricePaise !== null ? { limitPricePaise } : {})
       });
       const idempotencyKey = window.crypto.randomUUID();
-      return apiRequest("/api/v1/orders", OrderResponseSchema, token, {
+      return apiRequest("/api/v1/orders", V1OrderPlacementResponseSchema, token, {
         method: "POST",
         headers: { "Idempotency-Key": idempotencyKey },
         body: JSON.stringify(input)
@@ -405,7 +405,7 @@ export function OrderTicket({
         )}
         {order.data !== undefined && (
           <p className="market-order-feedback is-success" role="status">
-            Order {order.data.status.replaceAll("_", " ")} · {order.data.quantity} {symbol} share(s) · {order.data.type.toUpperCase()}
+            Order {order.data.order.status.replaceAll("_", " ")} · {order.data.order.quantity} {symbol} share(s) · {order.data.order.type.toUpperCase()}
           </p>
         )}
         <button
