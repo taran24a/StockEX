@@ -490,7 +490,7 @@ function MarketPulsePanel() {
       const rightPct = right.changePaise / Math.max(1, right.pricePaise - right.changePaise);
       return Math.abs(rightPct) - Math.abs(leftPct);
     })
-    .slice(0, 2);
+    .slice(0, 3);
 
   return (
     <section aria-labelledby="market-pulse-heading" className="workspace-panel workspace-market-pulse">
