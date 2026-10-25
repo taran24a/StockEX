@@ -2789,6 +2789,12 @@ html {
   background: linear-gradient(145deg, rgb(18 30 32 / 96%), rgb(13 21 27 / 98%));
 }
 
+@media (min-width: 901px) {
+  .workspace-market-pulse {
+    min-height: 518px;
+  }
+}
+
 .workspace-guardrails-panel {
   min-height: 270px;
   display: flex;
