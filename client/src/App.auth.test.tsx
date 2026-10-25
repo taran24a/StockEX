@@ -86,7 +86,7 @@ beforeEach(() => {
       ? { token: "session-token", expiresAt: "2027-10-25T00:00:00.000Z", user }
       : path === "/api/v1/portfolio"
         ? { totalEquityPaise: 0 }
-        : path.startsWith("/api/risk/alerts")
+        : path.startsWith("/api/v1/risk/alerts")
           ? { alerts: [] }
           : { user, avatarUrl: null }
   ));

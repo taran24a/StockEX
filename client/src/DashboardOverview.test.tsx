@@ -63,6 +63,29 @@ const riskSummary = {
   sectors: [{ name: "Technology", marketValuePaise: 15_950_000, concentrationPct: 68 }],
   warnings: ["ALFA is above the concentration guide."]
 };
+const riskRules = {
+  accountId: portfolio.accountId,
+  maxOrderNotionalPaise: 5_000_000,
+  maxSingleStockConcentrationPct: 60,
+  maxSectorConcentrationPct: 75,
+  createdAt: "2026-10-24T09:00:00.000Z",
+  updatedAt: "2026-10-24T09:00:00.000Z"
+};
+const instruments = {
+  instruments: [{
+    instrument: {
+      id: "90000000-0000-4000-8000-000000000001",
+      symbol: "ALFA",
+      name: "Alfa Compute Systems",
+      sector: "Technology",
+      tickSizePaise: 1,
+      lastPricePaise: 12_500_000,
+      createdAt: "2026-10-24T09:00:00.000Z",
+      updatedAt: "2026-10-24T09:00:00.000Z"
+    },
+    quote: null
+  }]
+};
 const riskAlerts = {
   alerts: [{
     id: "90000000-0000-4000-8000-000000000003",
@@ -114,8 +137,10 @@ beforeEach(() => {
     if (path === "/api/quotes") return Promise.resolve({ quotes: [{
       symbol: "ALFA", name: "Alfa Compute Systems", pricePaise: 12_500_000, changePaise: 12_500, updatedAt: "2026-10-24T10:30:00.000Z"
     }] });
-    if (path === "/api/risk/summary") return Promise.resolve(riskSummary);
-    if (path.startsWith("/api/risk/alerts")) return Promise.resolve(riskAlerts);
+    if (path === "/api/v1/risk/summary") return Promise.resolve(riskSummary);
+    if (path === "/api/v1/risk/rules") return Promise.resolve(riskRules);
+    if (path.startsWith("/api/v1/risk/alerts")) return Promise.resolve(riskAlerts);
+    if (path === "/api/market/instruments") return Promise.resolve(instruments);
     throw new Error(`Unexpected API request: ${path}`);
   });
 });
@@ -163,13 +188,15 @@ describe("dashboard overview", () => {
       if (path.startsWith("/api/v1/orders")) return Promise.resolve({ orders: [], pagination: { limit: 5, offset: 0, total: 0 } });
       if (path === "/api/watchlists") return Promise.resolve({ watchlists: [] });
       if (path === "/api/quotes") return Promise.resolve({ quotes: [] });
-      if (path === "/api/risk/summary") return Promise.resolve({ ...riskSummary, singleStocks: [], sectors: [], warnings: [] });
-      if (path.startsWith("/api/risk/alerts")) return Promise.resolve({ alerts: [], pagination: { limit: 5, offset: 0, total: 0 } });
+      if (path === "/api/v1/risk/summary") return Promise.resolve({ ...riskSummary, singleStocks: [], sectors: [], warnings: [] });
+      if (path === "/api/v1/risk/rules") return Promise.resolve(riskRules);
+      if (path.startsWith("/api/v1/risk/alerts")) return Promise.resolve({ alerts: [], pagination: { limit: 5, offset: 0, total: 0 } });
+      if (path === "/api/market/instruments") return Promise.resolve(instruments);
       throw new Error(`Unexpected API request: ${path}`);
     });
     renderOverview();
 
-    expect(await screen.findByText("No equity snapshots have been recorded yet.")).toBeTruthy();
+    expect(await screen.findByText("Your equity history starts here")).toBeTruthy();
     expect(screen.getByText("No open positions yet.")).toBeTruthy();
     expect(screen.getByText("You haven’t created a watchlist yet. Visit Markets to explore live quotes.")).toBeTruthy();
     expect(screen.getByText("No active risk warnings.")).toBeTruthy();

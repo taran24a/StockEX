@@ -70,7 +70,7 @@ beforeEach(() => {
   apiRequestMock.mockImplementation((path: string) => {
     if (path === "/api/v1/portfolio") return Promise.resolve(portfolio);
     if (path === "/api/v1/portfolio/performance") return Promise.resolve(performance);
-    if (path === "/api/risk/summary") return Promise.resolve(riskSummary);
+    if (path === "/api/v1/risk/summary") return Promise.resolve(riskSummary);
     if (path.startsWith("/api/v1/ledger?")) return Promise.resolve(ledger);
     if (path === "/api/v1/portfolio/verify") return Promise.resolve({ match: false, differences: [{ field: "cashBalancePaise", live: 100_000, rebuilt: 99_000 }] });
     return Promise.reject(new Error(`Unexpected API request: ${path}`));
