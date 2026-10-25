@@ -458,76 +458,22 @@ function AccountGuardrailsPanel() {
           risk.error instanceof Error ? <ErrorState message={`Current exposures could not be loaded: ${risk.error.message}`} /> :
             rules.data === undefined || risk.data === undefined ? <p className="workspace-panel-state">Account guardrails are unavailable.</p> : (
               <>
-                <div className="workspace-order-cap">
-                  <span>Maximum order size</span>
-                  <strong>{formatPaise(rules.data.maxOrderNotionalPaise)}</strong>
+                <div className="workspace-guardrail-grid">
+                  <div className="workspace-order-cap">
+                    <span>Maximum order size</span>
+                    <strong>{formatPaise(rules.data.maxOrderNotionalPaise)}</strong>
+                  </div>
+                  <div className="workspace-guardrail-limits">
+                    <div className="workspace-guardrail-section-title">Concentration limits</div>
+                    <ul className="workspace-guardrail-list">
+                      {limitRow("Single stock", largestStockPct, rules.data.maxSingleStockConcentrationPct)}
+                      {limitRow("Single sector", largestSectorPct, rules.data.maxSectorConcentrationPct)}
+                    </ul>
+                  </div>
                 </div>
-                <div className="workspace-guardrail-section-title">Concentration limits</div>
-                <ul className="workspace-guardrail-list">
-                  {limitRow("Single stock", largestStockPct, rules.data.maxSingleStockConcentrationPct)}
-                  {limitRow("Single sector", largestSectorPct, rules.data.maxSectorConcentrationPct)}
-                </ul>
                 <p className="workspace-guardrail-note">Current exposure is measured against your account limits.</p>
               </>
             )}
-    </section>
-  );
-}
-
-function MarketPulsePanel() {
-  const quotes = useQuery({
-    queryKey: ["quotes"],
-    queryFn: () => apiRequest("/api/quotes", QuotesResponseSchema),
-    refetchInterval: 10_000
-  });
-  const marketQuotes = quotes.data?.quotes ?? [];
-  const advancing = marketQuotes.filter((quote) => quote.changePaise > 0).length;
-  const declining = marketQuotes.filter((quote) => quote.changePaise < 0).length;
-  const unchanged = marketQuotes.length - advancing - declining;
-  const movers = [...marketQuotes]
-    .sort((left, right) => {
-      const leftPct = left.changePaise / Math.max(1, left.pricePaise - left.changePaise);
-      const rightPct = right.changePaise / Math.max(1, right.pricePaise - right.changePaise);
-      return Math.abs(rightPct) - Math.abs(leftPct);
-    })
-    .slice(0, 5);
-
-  return (
-    <section aria-labelledby="market-pulse-heading" className="workspace-panel workspace-market-pulse">
-      <div className="workspace-panel-heading">
-        <div>
-          <p className="workspace-eyebrow">Live market snapshot</p>
-          <h2 id="market-pulse-heading">Market pulse</h2>
-        </div>
-        <Link className="workspace-subtle-link" to="/app/markets">Explore markets</Link>
-      </div>
-      {quotes.isPending ? <PanelSkeleton label="Loading market pulse" /> :
-        quotes.error instanceof Error ? <ErrorState message={`Market quotes could not be loaded: ${quotes.error.message}`} /> :
-          marketQuotes.length === 0 ? <p className="workspace-panel-state">Market quotes are not available right now.</p> : (
-            <>
-              <div aria-label={`Market breadth: ${advancing} advancing, ${declining} declining, ${unchanged} unchanged`} className="workspace-market-breadth">
-                <div><strong>{marketQuotes.length}</strong><span>instruments</span></div>
-                <span className="is-gain">{advancing} up</span>
-                <span className="is-loss">{declining} down</span>
-                {unchanged > 0 && <span className="is-flat">{unchanged} flat</span>}
-              </div>
-              <div className="workspace-market-movers-heading"><span>Biggest movers</span><span>Last price · change</span></div>
-              <ul className="workspace-market-movers">
-                {movers.map((quote) => {
-                  const previousPricePaise = Math.max(1, quote.pricePaise - quote.changePaise);
-                  const changePct = quote.changePaise / previousPricePaise * 100;
-                  const tone = changePct > 0 ? "is-gain" : changePct < 0 ? "is-loss" : "is-flat";
-                  return (
-                    <li key={quote.symbol}>
-                      <Link aria-label={`View ${quote.symbol} market details`} to={`/app/markets/${encodeURIComponent(quote.symbol)}`}><strong>{quote.symbol}</strong></Link>
-                      <span>{formatPaise(quote.pricePaise)}</span>
-                      <strong className={tone}>{changePct > 0 ? "+" : ""}{changePct.toFixed(2)}%</strong>
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          )}
     </section>
   );
 }
@@ -655,12 +601,11 @@ export function DashboardOverview() {
         <div className="workspace-dashboard-primary">
           <HoldingsPanel />
           <OrdersPanel />
-          <MarketPulsePanel />
+          <AccountGuardrailsPanel />
         </div>
         <aside className="workspace-dashboard-secondary" aria-label="Watchlist and risk information">
           <WatchlistPanel />
           <RiskPanel />
-          <AccountGuardrailsPanel />
         </aside>
       </div>
       <p className="workspace-disclaimer">Practice with virtual money only. Market data may be delayed. This workspace is for learning, not financial advice.</p>
