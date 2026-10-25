@@ -1,4 +1,5 @@
 import {
+  AiExplainResponseSchema,
   AccountPortfolioResponseSchema,
   PaginatedOrdersResponseSchema,
   PortfolioPerformanceResponseSchema,
@@ -8,7 +9,7 @@ import {
   WatchlistsResponseSchema,
   type RiskAlert
 } from "@tradewise/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { apiRequest } from "./api";
@@ -254,6 +255,49 @@ function OrdersPanel() {
   );
 }
 
+function PortfolioExplanationPanel() {
+  const { token } = useAuth();
+  const explanation = useMutation({
+    mutationFn: () => apiRequest("/api/ai/explain", AiExplainResponseSchema, token ?? undefined, {
+      method: "POST"
+    })
+  });
+
+  return (
+    <section aria-labelledby="portfolio-explanation-heading" className="workspace-panel workspace-ai-explanation">
+      <div className="workspace-panel-heading">
+        <div>
+          <p className="workspace-eyebrow">Portfolio insights</p>
+          <h2 id="portfolio-explanation-heading">Explain my portfolio</h2>
+        </div>
+        {explanation.data !== undefined && (
+          <span className="workspace-ai-source">{explanation.data.source === "ollama" ? "Local AI" : "Data summary"}</span>
+        )}
+      </div>
+      <p className="workspace-ai-disclaimer">A factual summary of your portfolio metrics. It does not place or approve orders and is not financial advice.</p>
+      {explanation.error instanceof Error ? (
+        <p className="workspace-error" role="alert">Portfolio explanation could not be generated: {explanation.error.message}</p>
+      ) : explanation.data !== undefined ? (
+        <>
+          <p className="workspace-ai-summary">{explanation.data.explanation}</p>
+          <ul className="workspace-ai-highlights">
+            {explanation.data.highlights.map((highlight, index) => <li key={`${index}-${highlight}`}>{highlight}</li>)}
+          </ul>
+          <p className="workspace-ai-generated">Updated {formatDate(explanation.data.generatedAt)}</p>
+        </>
+      ) : (
+        <p className="workspace-panel-state">Generate a numeric summary of current equity, return, P&amp;L, and holding contributions.</p>
+      )}
+      <button
+        className="workspace-button"
+        disabled={token === null || explanation.isPending}
+        onClick={() => explanation.mutate()}
+        type="button"
+      >{explanation.isPending ? "Preparing explanation…" : "Explain my portfolio"}</button>
+    </section>
+  );
+}
+
 function RiskPanel() {
   const { token } = useAuth();
   const risk = useQuery({
@@ -363,6 +407,7 @@ export function DashboardOverview() {
         <Metric label="Day P&L" value={dayChange} loading={performance.isPending} error={performanceError} tone={dayChange === undefined ? undefined : dayChange >= 0 ? "gain" : "loss"} />
         <Metric label="Unrealized P&L" value={unrealized} loading={performance.isPending} error={performanceError} tone={unrealized === undefined ? undefined : unrealized >= 0 ? "gain" : "loss"} />
       </section>
+      <PortfolioExplanationPanel />
 
       <section aria-labelledby="allocation-heading" className="workspace-panel workspace-allocation-panel">
         <div className="workspace-allocation-intro">

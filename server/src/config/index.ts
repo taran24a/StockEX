@@ -12,6 +12,8 @@ export const EnvironmentSchema = z.object({
   DATABASE_URL: z.string().url().default("postgres://tradewise:tradewise@localhost:5432/tradewise"),
   JWT_SECRET: z.string().min(32).default("local-development-secret-change-before-deployment"),
   MOCK_FEED_URL: z.string().url().default("http://localhost:4000"),
+  OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
+  OLLAMA_MODEL: z.string().trim().min(1).max(128).default("llama3.2:3b"),
   CLIENT_ORIGIN: z.string().url().default("http://localhost:5173"),
   MINIO_ENDPOINT: z.string().default("localhost"),
   MINIO_PORT: z.coerce.number().int().min(1).max(65535).default(9000),

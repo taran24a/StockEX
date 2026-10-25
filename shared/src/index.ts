@@ -349,6 +349,45 @@ export const PortfolioPerformanceResponseSchema = z.object({
   equityCurve: z.array(EquityCurvePointSchema)
 });
 
+export const PortfolioInsightMetricsSchema = z.object({
+  totalEquityPaise: paiseSchema,
+  cashBalancePaise: paiseSchema,
+  contributedCapitalPaise: paiseSchema,
+  returnPct: z.number().nullable(),
+  realizedPnlPaise: z.number().int().safe(),
+  unrealizedPnlPaise: z.number().int().safe(),
+  dayChangePaise: z.number().int().safe(),
+  holdings: z.array(z.object({
+    symbol: symbolSchema,
+    marketValuePaise: paiseSchema,
+    unrealizedPnlPaise: z.number().int().safe(),
+    dayChangeContributionPaise: z.number().int().safe()
+  }))
+});
+
+export const AiExplainResponseSchema = z.object({
+  source: z.enum(["ollama", "template"]),
+  explanation: z.string().min(1).max(1200),
+  highlights: z.array(z.string().min(1).max(240)).max(5),
+  metrics: PortfolioInsightMetricsSchema,
+  generatedAt: z.iso.datetime()
+});
+
+export const LeagueEntrySchema = z.object({
+  rank: z.number().int().positive().safe(),
+  displayName: z.string().min(1).max(60),
+  currentEquityPaise: paiseSchema,
+  returnPct: z.number(),
+  maxDrawdownPct: z.number().min(0).max(100),
+  riskAdjustedScore: z.number(),
+  updatedAt: z.iso.datetime()
+});
+
+export const LeagueResponseSchema = z.object({
+  entries: z.array(LeagueEntrySchema),
+  pagination: PaginationResponseSchema
+});
+
 export const FillSchema = z.object({
   id: z.uuid(),
   orderId: z.uuid(),
@@ -723,6 +762,10 @@ export type AccountPortfolioResponse = z.infer<typeof AccountPortfolioResponseSc
 export type EquityCurvePoint = z.infer<typeof EquityCurvePointSchema>;
 export type HoldingContribution = z.infer<typeof HoldingContributionSchema>;
 export type PortfolioPerformanceResponse = z.infer<typeof PortfolioPerformanceResponseSchema>;
+export type PortfolioInsightMetrics = z.infer<typeof PortfolioInsightMetricsSchema>;
+export type AiExplainResponse = z.infer<typeof AiExplainResponseSchema>;
+export type LeagueEntry = z.infer<typeof LeagueEntrySchema>;
+export type LeagueResponse = z.infer<typeof LeagueResponseSchema>;
 export type Fill = z.infer<typeof FillSchema>;
 export type LedgerEntryType = z.infer<typeof LedgerEntryTypeSchema>;
 export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;

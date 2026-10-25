@@ -8,6 +8,7 @@ import { attachTradingWebSocket } from "./market/trading-websocket.js";
 import { startPriceTicker } from "./services/price-ticker.js";
 import { startMarketMaker } from "./services/market-maker.js";
 import { SimulationControls } from "./services/simulation-controls.js";
+import { startLeagueSnapshotJob } from "./services/league-snapshot.js";
 import { createObjectStorage, ensureUploadBucket } from "./storage.js";
 
 const environment = loadEnvironment();
@@ -21,11 +22,13 @@ const closeQuoteStream = attachQuoteStream(server, environment.MOCK_FEED_URL);
 const closeTradingWebSocket = attachTradingWebSocket(server, pool, environment.JWT_SECRET);
 let stopPriceTicker = (): void => undefined;
 let stopMarketMaker = (): void => undefined;
+let stopLeagueSnapshotJob = (): void => undefined;
 
 try {
   await ensureUploadBucket(objectStorage, environment.MINIO_BUCKET);
   stopPriceTicker = startPriceTicker(pool, environment.MOCK_FEED_URL, 1_000, simulationControls);
   stopMarketMaker = startMarketMaker(pool, 5_000, simulationControls);
+  stopLeagueSnapshotJob = startLeagueSnapshotJob(pool);
   server.listen(environment.PORT, () => {
     logger.info({ port: environment.PORT }, "TradeWise API listening");
   });
@@ -48,6 +51,7 @@ function shutdown(signal: NodeJS.Signals): void {
   closeTradingWebSocket();
   stopPriceTicker();
   stopMarketMaker();
+  stopLeagueSnapshotJob();
   server.close((error) => {
     if (error !== undefined) {
       logger.error({ err: error }, "HTTP server shutdown failed");

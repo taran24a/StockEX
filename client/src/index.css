@@ -5319,3 +5319,94 @@ html {
     padding: 1rem;
   }
 }
+
+.workspace-ai-explanation {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.workspace-ai-explanation .workspace-panel-heading {
+  margin-bottom: 0;
+}
+
+.workspace-ai-source {
+  border: 1px solid #315653;
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  color: #9be3d6;
+  font-size: 0.65rem;
+}
+
+.workspace-ai-disclaimer,
+.workspace-ai-generated {
+  margin: 0;
+  color: #8fa0a6;
+  font-size: 0.67rem;
+  line-height: 1.5;
+}
+
+.workspace-ai-summary {
+  margin: 0;
+  color: #d9e5e7;
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+.workspace-ai-highlights {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #aebdc2;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.workspace-league {
+  display: grid;
+  gap: 1rem;
+}
+
+.workspace-league .workspace-page-heading {
+  padding: 0.25rem 0 0.5rem;
+}
+
+.workspace-league .workspace-page-heading h2 {
+  margin: 0.2rem 0;
+  color: #edf4f5;
+  font-size: 1.5rem;
+}
+
+.workspace-league .workspace-page-heading > p:last-child {
+  margin: 0;
+  color: #94a3a9;
+  font-size: 0.75rem;
+}
+
+.workspace-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.8rem;
+  color: #91a0a5;
+  font-size: 0.68rem;
+}
+
+.workspace-pagination > div {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.workspace-pagination button {
+  border: 1px solid #34474d;
+  border-radius: 0.4rem;
+  background: #162328;
+  padding: 0.4rem 0.6rem;
+  color: #a8dedb;
+  font-size: 0.68rem;
+}
+
+.workspace-pagination button:disabled {
+  opacity: 0.45;
+}

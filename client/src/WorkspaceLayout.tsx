@@ -15,6 +15,7 @@ const OrdersPage = lazy(() => import("./Orders").then((module) => ({ default: mo
 const PortfolioPage = lazy(() => import("./Portfolio").then((module) => ({ default: module.PortfolioPage })));
 const RiskPage = lazy(() => import("./Risk").then((module) => ({ default: module.RiskPage })));
 const ProfilePage = lazy(() => import("./Profile").then((module) => ({ default: module.ProfilePage })));
+const LeaguePage = lazy(() => import("./League").then((module) => ({ default: module.LeaguePage })));
 
 const navigation = [
   { label: "Dashboard", path: "/app/dashboard", mark: "D" },
@@ -22,7 +23,8 @@ const navigation = [
   { label: "Orders", path: "/app/orders", mark: "O" },
   { label: "Portfolio", path: "/app/portfolio", mark: "P" },
   { label: "Risk", path: "/app/risk", mark: "R" },
-  { label: "Profile", path: "/app/profile", mark: "U" }
+  { label: "Profile", path: "/app/profile", mark: "U" },
+  { label: "League", path: "/app/league", mark: "L" }
 ];
 
 const pageTitles: Record<string, string> = {
@@ -370,6 +372,7 @@ export function WorkspaceLayout() {
               <Route element={<PortfolioPage />} path="portfolio" />
               <Route element={<RiskPage />} path="risk" />
               <Route element={<ProfilePage />} path="profile" />
+              <Route element={<LeaguePage />} path="league" />
               <Route element={<WorkspaceStub detail="This workspace route is not implemented yet." title="Page not found" />} path="*" />
             </Routes>
           </Suspense>

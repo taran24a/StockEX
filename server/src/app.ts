@@ -22,6 +22,8 @@ import { createWatchlistsRouter } from "./routes/watchlists.js";
 import { createV1OrdersRouter } from "./routes/v1-orders.js";
 import { createV1PortfolioRouter } from "./routes/v1-portfolio.js";
 import { createRiskRouter } from "./routes/risk.js";
+import { createAiRouter } from "./routes/ai.js";
+import { createLeagueRouter } from "./routes/league.js";
 import type { Client as MinioClient } from "minio";
 import { logger } from "./logger.js";
 import type { SimulationControls } from "./services/simulation-controls.js";
@@ -134,6 +136,8 @@ export function createApp(dependencies?: AppDependencies): express.Express {
     app.use("/api/v1/orders", createV1OrdersRouter(pool, environment.JWT_SECRET));
     app.use("/api/v1", createV1PortfolioRouter(pool, environment.JWT_SECRET));
     app.use("/api/v1/risk", createRiskRouter(pool, environment.JWT_SECRET));
+    app.use("/api/ai", createAiRouter(pool, environment));
+    app.use("/api/league", createLeagueRouter(pool, environment.JWT_SECRET));
     app.use("/api/auth", authRouter);
     app.use("/api/admin", createAdminRouter(pool, environment.JWT_SECRET, dependencies.simulationControls));
     app.use("/api/market", createMarketRouter(pool, environment.MOCK_FEED_URL));
