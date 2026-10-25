@@ -59,6 +59,8 @@ The Bruno collection is in [bruno/TradeWise](./bruno/TradeWise). Open it in Brun
 - `POST /api/v1/auth/me/avatar` (JPEG, PNG, or WebP; 2 MB maximum; stored in S3-compatible object storage)
 - `GET/PATCH /api/v1/users/me`, `PATCH /api/v1/users/me/password`, `POST /api/v1/users/me/reset`, and `POST /api/v1/users/me/avatar`
 - `GET /api/quotes` and `GET /api/quotes/ws`
+- `GET/POST /api/ai/explain` (authenticated; numeric metrics only; Ollama is optional and the POST endpoint falls back to a deterministic explanation)
+- `GET /api/league?limit=20&offset=0` (authenticated, scheduled paginated standings)
 - `GET /api/market/quotes`, `GET /api/market/instruments`, `GET /api/market/:symbol`, `GET /api/market/:symbol/candles`, `GET /api/market/:symbol/depth`
 - Authenticated watchlist CRUD at `/api/watchlists`, including instrument add/remove routes
 - `GET /api/wallet`, `GET /api/portfolio`
@@ -70,6 +72,8 @@ The protected `/app/orders` workspace supports URL-backed status, side, symbol, 
 The protected `/app/portfolio` workspace shows holdings and per-position P&L, stock and sector allocation, performance contributions, paginated ledger activity, a downloadable CSV statement, and ledger-replay verification.
 The protected `/app/risk` workspace edits account trading limits, displays concentration gauges and read/unread risk alerts, and previews hypothetical buy/sell concentration through `POST /api/v1/risk/preview` without placing an order.
 The protected `/app/profile` workspace edits the display name, uploads a validated avatar, changes the password, and shows account details. It also provides a typed-confirmation reset for the virtual account; reset cancels open orders, clears positions, restores ₹10,00,000 virtual cash, and retains historical trading and ledger records. Administrators can configure the global reset cooldown (initially 24 hours). Migration `009_virtual_account_reset` must be applied before using the profile/reset endpoints.
+The dashboard's **Explain my portfolio** card requests a factual explanation of computed equity, return, P&L, and numeric per-holding contributions. `POST /api/ai/explain` can use local Ollama configured with `OLLAMA_BASE_URL` and `OLLAMA_MODEL`; only numeric metrics are sent to the model, output must match a strict JSON schema, and an unavailable model uses a deterministic template. Explanation endpoints are rate limited. Explanations never place or approve orders.
+The protected `/app/league` workspace shows paginated standings. A server-side 60-second job snapshots equity and calculates return against contributed capital, maximum drawdown, and risk-adjusted score (`returnPct / max(maxDrawdownPct, 1)`). The leaderboard excludes the dedicated liquidity bot and retains equity history for 90 days. Apply migration `010_league_rankings` before enabling the league.
 
 Administrators also see a read-only user directory in the dashboard, backed by this endpoint.
 The `/admin` workspace is restricted to administrator accounts and includes platform statistics, user role management, instrument CSV import with upload progress, filtered domain-event audit history, and controls to pause or resume the market-maker bot and price ticker.

@@ -258,6 +258,38 @@ paths:
         "400": {$ref: "#/components/responses/BadRequest"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "503": {description: The simulation service is unavailable}
+  /api/ai/explain:
+    get:
+      tags: [Portfolio]
+      summary: Return a deterministic numeric portfolio explanation
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Portfolio metrics and deterministic explanation}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {description: Explanation read rate limit exceeded}
+    post:
+      tags: [Portfolio]
+      summary: Explain portfolio metrics with local Ollama
+      description: Sends only computed numeric metrics to the configured local model. Falls back to a deterministic template if Ollama is unavailable. Never places or approves orders.
+      security: [{BearerAuth: []}]
+      responses:
+        "200": {description: Validated model explanation or deterministic fallback}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {description: Model explanation rate limit exceeded}
+        "502": {description: Local model returned invalid JSON or an invalid response}
+  /api/league:
+    get:
+      tags: [Portfolio]
+      summary: Get the paginated paper-trading leaderboard
+      description: Rankings are refreshed by a server-side scheduled snapshot job. Risk-adjusted score is return percentage divided by max(maximum drawdown percentage, 1).
+      security: [{BearerAuth: []}]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200": {description: Paginated standings ordered by risk-adjusted score, return, then lower drawdown}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {description: Leaderboard request rate limit exceeded}
   /api/market/quotes:
     get:
       tags: [Market]

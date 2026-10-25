@@ -255,7 +255,7 @@ function OrdersPanel() {
   );
 }
 
-function PortfolioExplanationPanel() {
+export function PortfolioExplanationPanel() {
   const { token } = useAuth();
   const explanation = useMutation({
     mutationFn: () => apiRequest("/api/ai/explain", AiExplainResponseSchema, token ?? undefined, {
