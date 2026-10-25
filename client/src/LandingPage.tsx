@@ -21,7 +21,6 @@ function EmptyChartState({ symbol }: { symbol: string }) {
       <svg aria-hidden="true" className="landing-empty-chart-art" viewBox="0 0 420 170" preserveAspectRatio="none">
         <path d="M0 34.5h420M0 84.5h420M0 134.5h420" />
         <path className="landing-empty-chart-baseline" d="M0 153.5h420" />
-        <path className="landing-empty-chart-candle" d="M48 75v48m-7-30h14v19H41zM112 43v59m-7-27h14v19h-14zM176 88v44m-7-23h14v14h-14zM240 55v62m-7-34h14v22h-14zM304 75v57m-7-30h14v19h-14zM368 39v56m-7-24h14v17h-14z" />
       </svg>
       <div className="landing-empty-chart-copy">
         <span aria-hidden="true" className="landing-empty-chart-icon">⌁</span>

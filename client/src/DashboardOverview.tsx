@@ -96,6 +96,23 @@ function ChangeValue({ value }: { value: number }) {
   );
 }
 
+function EmptyEquityState() {
+  return (
+    <div className="workspace-equity-empty">
+      <svg aria-hidden="true" viewBox="0 0 640 160" preserveAspectRatio="none">
+        <path d="M0 30.5h640M0 70.5h640M0 110.5h640M0 150.5h640" />
+        <path className="workspace-equity-empty-axis" d="M0 150.5h640" />
+      </svg>
+      <div className="workspace-equity-empty-copy">
+        <span aria-hidden="true">↗</span>
+        <strong>Your equity history starts here</strong>
+        <p>Portfolio snapshots will appear as your practice account grows.</p>
+        <Link className="workspace-subtle-link" to="/app/markets">Explore markets <span aria-hidden="true">→</span></Link>
+      </div>
+    </div>
+  );
+}
+
 function formatDate(value: string): string {
   return new Date(value).toLocaleString();
 }
@@ -476,7 +493,7 @@ export function DashboardOverview() {
         </div>
         {performance.isPending ? <PanelSkeleton label="Loading equity history" /> :
           performanceError !== null ? <ErrorState message={performanceError.message} /> :
-            curve.length === 0 ? <p className="workspace-panel-state">{chartSummary}</p> : (
+            curve.length === 0 ? <EmptyEquityState /> : (
               <>
                 <LivePriceChart data={curve} ariaLabel={`Portfolio equity curve. ${chartSummary}`} />
                 <p className="sr-only">{chartSummary}</p>

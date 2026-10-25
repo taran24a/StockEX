@@ -5475,3 +5475,128 @@ html {
 .workspace-pagination button:disabled {
   opacity: 0.45;
 }
+
+/* A gentle chart scaffold keeps empty data states from feeling unfinished. */
+.landing-empty-chart {
+  position: relative;
+  display: grid;
+  min-height: 220px;
+  overflow: hidden;
+  align-items: center;
+  border: 1px solid rgb(145 163 176 / 12%);
+  background: linear-gradient(180deg, rgb(16 29 33 / 44%), rgb(8 15 20 / 28%));
+}
+
+.landing-empty-chart-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.landing-empty-chart-art > path {
+  fill: none;
+  stroke: rgb(135 171 163 / 12%);
+  stroke-width: 1;
+  stroke-dasharray: 3 6;
+}
+
+.landing-empty-chart-art > .landing-empty-chart-baseline {
+  stroke: rgb(145 163 176 / 24%);
+  stroke-dasharray: none;
+}
+
+.landing-empty-chart-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.landing-empty-chart-icon,
+.workspace-equity-empty-copy > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid #3c5a53;
+  border-radius: 50%;
+  background: #14221f;
+  color: var(--landing-green);
+  font-size: 1.35rem;
+}
+
+.landing-empty-chart-copy p {
+  margin: 0.2rem 0 0;
+  color: var(--landing-soft);
+  font-size: 0.78rem;
+  font-weight: 620;
+}
+
+.landing-empty-chart-copy > span:last-child {
+  color: var(--landing-muted);
+  font-size: 0.69rem;
+}
+
+.workspace-equity-empty {
+  position: relative;
+  display: grid;
+  min-height: 240px;
+  overflow: hidden;
+  align-items: center;
+  border: 1px solid rgb(145 163 176 / 11%);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgb(14 24 29 / 70%), rgb(9 15 21 / 30%));
+}
+
+.workspace-equity-empty > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.workspace-equity-empty > svg path {
+  fill: none;
+  stroke: rgb(145 163 176 / 11%);
+  stroke-dasharray: 3 6;
+  stroke-width: 1;
+}
+
+.workspace-equity-empty > svg .workspace-equity-empty-axis {
+  stroke: rgb(145 163 176 / 23%);
+  stroke-dasharray: none;
+}
+
+.workspace-equity-empty-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.workspace-equity-empty-copy > span {
+  color: var(--workspace-green);
+}
+
+.workspace-equity-empty-copy strong {
+  margin-top: 0.2rem;
+  color: #dce7e8;
+  font-size: 0.78rem;
+}
+
+.workspace-equity-empty-copy p {
+  margin: 0;
+  color: #91a1a7;
+  font-size: 0.68rem;
+}
+
+.workspace-equity-empty-copy .workspace-subtle-link {
+  margin-top: 0.3rem;
+}
