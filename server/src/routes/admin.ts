@@ -165,12 +165,11 @@ export function createAdminRouter(pool: Pool, secret: string, simulationControls
     validateBody(SimulationControlRequestSchema),
     (_request, response) => {
       const { name, running } = validatedBody<{ name: "marketMaker" | "ticker"; running: boolean }>(response);
-      const status = simulationControls?.getStatus()[name];
-      if (status?.available !== true) {
+      if (simulationControls === undefined || !simulationControls.getStatus()[name].available) {
         throw new ApiError(503, "SIMULATION_UNAVAILABLE", "The selected simulation service is unavailable");
       }
-      simulationControls?.setRunning(name, running);
-      response.json(SimulationControlsResponseSchema.parse(simulationControls?.getStatus()));
+      simulationControls.setRunning(name, running);
+      response.json(SimulationControlsResponseSchema.parse(simulationControls.getStatus()));
     }
   );
 

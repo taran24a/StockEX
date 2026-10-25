@@ -210,7 +210,7 @@ function ImportPanel({ token }: { token: string }) {
           type="button"
         >{importMutation.isPending ? "Importing…" : "Import instruments"}</button>
       )}
-      {importMutation.isPending && (
+      {file !== null && (importMutation.isPending || importMutation.isSuccess) && (
         <div aria-label="Upload progress" className="admin-progress" role="progressbar" aria-valuemax={100} aria-valuemin={0} aria-valuenow={progress}>
           <span style={{ width: `${progress}%` }} />
         </div>
@@ -325,6 +325,7 @@ function SimulationPanel({ token }: { token: string }) {
                     {!status.available ? "Unavailable" : status.running ? "Running" : "Paused"}
                   </span></div>
                   <button
+                    aria-label={`${status.running ? "Pause" : "Resume"} ${label}`}
                     className={status.running ? "admin-secondary-button" : "admin-primary-button"}
                     disabled={!status.available || update.isPending}
                     onClick={() => update.mutate({ name, running: !status.running })}

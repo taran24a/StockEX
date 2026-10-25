@@ -170,7 +170,7 @@ describe("public landing route", () => {
 
   it("keeps the admin workspace available only to admins", async () => {
     useAuthMock.mockReturnValue({
-      token: null,
+      token: "admin-token",
       user: { id: "2", email: "admin@example.com", displayName: "Admin", role: "admin" },
       ready: true,
       error: null,
