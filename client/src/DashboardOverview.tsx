@@ -1,20 +1,17 @@
 import {
   AiExplainResponseSchema,
   AccountPortfolioResponseSchema,
-  MarketInstrumentsResponseSchema,
   PaginatedOrdersResponseSchema,
   PortfolioPerformanceResponseSchema,
   QuotesResponseSchema,
   RiskAlertsResponseSchema,
-  RiskPreviewRequestSchema,
-  RiskPreviewResponseSchema,
   RiskRulesSchema,
   RiskSummarySchema,
   WatchlistsResponseSchema,
   type RiskAlert
 } from "@tradewise/shared";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { apiRequest } from "./api";
 import { useAuth } from "./auth";
@@ -336,25 +333,6 @@ function RiskPanel() {
     queryFn: () => apiRequest("/api/v1/risk/rules", RiskRulesSchema, token ?? undefined),
     enabled: token !== null
   });
-  const instruments = useQuery({
-    queryKey: ["market", "instruments"],
-    queryFn: () => apiRequest("/api/market/instruments", MarketInstrumentsResponseSchema, token ?? undefined),
-    enabled: token !== null
-  });
-  const [selectedSymbol, setSelectedSymbol] = useState("");
-  const [previewSide, setPreviewSide] = useState<"buy" | "sell">("buy");
-  const [previewQuantity, setPreviewQuantity] = useState("1");
-  const symbol = selectedSymbol || instruments.data?.instruments[0]?.instrument.symbol || "";
-  const preview = useMutation({
-    mutationFn: () => {
-      const parsed = RiskPreviewRequestSchema.safeParse({ symbol, side: previewSide, quantity: Number(previewQuantity) });
-      if (!parsed.success) throw new Error(parsed.error.issues.map((issue) => issue.message).join("; "));
-      return apiRequest("/api/v1/risk/preview", RiskPreviewResponseSchema, token ?? undefined, {
-        method: "POST",
-        body: JSON.stringify(parsed.data)
-      });
-    }
-  });
   const alertItems: RiskAlert[] = alerts.data?.alerts ?? [];
   const concentrations = [...(risk.data?.singleStocks ?? []).map((item) => ({ ...item, kind: "Stock" })),
     ...(risk.data?.sectors ?? []).map((item) => ({ ...item, kind: "Sector" }))]
@@ -366,11 +344,6 @@ function RiskPanel() {
     return item.concentrationPct >= limit * 0.8 && item.concentrationPct <= limit;
   });
   const riskStatus = aboveLimitCount > 0 ? "is-critical" : nearLimit ? "is-warning" : "is-clear";
-
-  function submitPreview(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    preview.mutate();
-  }
 
   return (
     <section aria-labelledby="risk-heading" className="workspace-panel">
@@ -403,7 +376,7 @@ function RiskPanel() {
                   <Link className="workspace-subtle-link" to="/app/risk">Limits &amp; alerts</Link>
                 </div>
                 {concentrations.length === 0 ? (
-                  <p className="workspace-panel-state">No open positions yet. Try a hypothetical order below to preview its impact.</p>
+                  <p className="workspace-panel-state">No open positions yet.</p>
                 ) : (
                   <ul className="workspace-concentration">
                     {concentrations.map((item) => {
@@ -436,43 +409,6 @@ function RiskPanel() {
                     ))}
                   </ul>
                 )}
-                <div className="workspace-what-if">
-                  <div className="workspace-risk-section-heading">
-                    <div><span>Practice preview</span><p>No order will be placed</p></div>
-                  </div>
-                  {instruments.isPending ? <PanelSkeleton label="Loading instruments for risk preview" /> :
-                    instruments.error instanceof Error ? <ErrorState message={`Instruments could not be loaded: ${instruments.error.message}`} /> : (
-                      <form className="workspace-what-if-form" onSubmit={submitPreview}>
-                        <label><span>Instrument</span>
-                          <select onChange={(event) => { setSelectedSymbol(event.target.value); preview.reset(); }} value={symbol}>
-                            {instruments.data?.instruments.length === 0 && <option value="">No instruments available</option>}
-                            {instruments.data?.instruments.map(({ instrument }) => <option key={instrument.id} value={instrument.symbol}>{instrument.symbol}</option>)}
-                          </select>
-                        </label>
-                        <label><span>Side</span>
-                          <select onChange={(event) => { setPreviewSide(event.target.value as "buy" | "sell"); preview.reset(); }} value={previewSide}>
-                            <option value="buy">Buy</option><option value="sell">Sell</option>
-                          </select>
-                        </label>
-                        <label><span>Quantity</span>
-                          <input min="1" onChange={(event) => { setPreviewQuantity(event.target.value); preview.reset(); }} step="1" type="number" value={previewQuantity} />
-                        </label>
-                        <button className="workspace-button" disabled={preview.isPending || symbol === ""} type="submit">
-                          {preview.isPending ? "Checking…" : "Preview impact"}
-                        </button>
-                      </form>
-                    )}
-                  {preview.error instanceof Error && <ErrorState message={`Preview could not be calculated: ${preview.error.message}`} />}
-                  {preview.data !== undefined && (
-                    <div className={`workspace-preview-result ${preview.data.rejection === null ? "is-allowed" : "is-rejected"}`} role="status">
-                      <div><strong>{preview.data.rejection === null ? "Within configured limits" : "Would exceed a limit"}</strong>
-                        <span>{preview.data.side.toUpperCase()} {preview.data.quantity.toLocaleString("en-IN")} {preview.data.symbol} · {formatPaise(preview.data.orderNotionalPaise)}</span>
-                        {preview.data.rejection !== null && <p>{preview.data.rejection}</p>}
-                      </div>
-                      <p>Stock {preview.data.currentStockPct.toFixed(1)}% → {preview.data.projectedStockPct.toFixed(1)}%<br />Sector {preview.data.currentSectorPct.toFixed(1)}% → {preview.data.projectedSectorPct.toFixed(1)}%</p>
-                    </div>
-                  )}
-                </div>
               </>
             )}
     </section>
