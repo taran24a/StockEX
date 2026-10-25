@@ -12,18 +12,20 @@ TradeWise is a paper-trading simulator. All balances and trades are virtual; it 
 ```powershell
 Copy-Item .env.server.example .env
 Copy-Item .env.client.example client/.env
-docker compose up -d
+docker compose up --build -d
 npm install
-npm run migrate:up
 ```
+
+The Compose stack publishes the client at <http://localhost:5173>, the API at <http://localhost:3000>, the synthetic feed on port 4000, PostgreSQL on port 5433, and RustFS S3-compatible storage on port 9000 (console: 9001). The database uses the persistent `tradewise-postgres` Compose volume and is separate from a Windows PostgreSQL service. Compose deliberately does **not** migrate or seed the database automatically. After the API container is running, initialize only the Compose database when you are ready:
 
 ```powershell
-npm run dev
+docker compose exec api node server/dist/db/migrate.js up
+docker compose exec api node server/dist/db/seed.js
 ```
 
-Open <http://localhost:5173>. The API listens on port 3000, the synthetic feed on 4000, PostgreSQL on 5432, and RustFS S3-compatible storage on 9000 (console: 9001). The API creates its upload bucket when it starts, so wait for storage to become ready first.
+For the host-based development workflow, start the Compose infrastructure and run `npm run dev`; that starts the API, client, and synthetic feed from the host. Configure the host `DATABASE_URL` for whichever PostgreSQL service you intend to use (`localhost:5432` for a native Windows service or `localhost:5433` for the Compose database). Apply migrations and seed only after confirming the selected database.
 
-The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scripts include `dev`, `build`, `test`, `lint`, `seed`, `repl`, `demo:modules`, `migrate:up`, `migrate:down`, `candles:generate`, and `candles:import`. `npm run dev` runs the API, client, and separate synthetic feed process. The REPL provides `engine` (a DEMO-symbol order book), `bus` (typed domain event bus), and `pool` (PostgreSQL pool) in its context. Run `npm run demo:modules` to see the ESM/CommonJS interoperability example. Migration 002 adds accounts, instruments, candles, fills, ledger, events, risk, and watchlist tables while preserving existing API tables and data. `npm run migrate:down` rolls back one migration and drops its new trading-domain tables.
+The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scripts include `dev`, `build`, `test`, `lint`, `seed`, `repl`, `demo:modules`, `migrate:up`, `migrate:down`, `candles:generate`, and `candles:import`. The REPL provides `engine` (a DEMO-symbol order book), `bus` (typed domain event bus), and `pool` (PostgreSQL pool) in its context. Run `npm run demo:modules` to see the ESM/CommonJS interoperability example. Migration 002 adds accounts, instruments, candles, fills, ledger, events, risk, and watchlist tables while preserving existing API tables. `npm run migrate:down` rolls back one migration and drops its new trading-domain tables.
 
 New accounts receive **100,000,000 paise (₹1,000,000)** in virtual cash. Local credentials in `.env.server.example` are for development only; set a unique `JWT_SECRET` and service credentials before deployment. Keep `.env` out of version control.
 
@@ -51,6 +53,20 @@ Interactive API documentation is at <http://localhost:3000/api/docs>.
 The hand-maintained OpenAPI 3.1 document is [server/openapi.yaml](./server/openapi.yaml) and is served at <http://localhost:3000/api/docs/openapi.yaml>.
 
 The Bruno collection is in [bruno/TradeWise](./bruno/TradeWise). Open it in Bruno with the **Local** environment. The request sequence for register → login → place order → timeline → replay is described in [Trade-flow.md](./bruno/TradeWise/Flows/Trade-flow.md); avatar upload requests use a replaceable local-file placeholder.
+
+### Docker images and smoke test
+
+`Dockerfile.server` builds the shared package and API/feed runtime; `Dockerfile.client` builds the React app and serves it with Nginx, including SPA and API/WebSocket proxying. `docker compose up --build` starts the full local stack. Migrations and seeding remain explicit commands above; verify the database target before applying them.
+
+The end-to-end smoke test is restricted to a database named `tradewise_test`. Prepare that dedicated database with migrations and seed data, then run:
+
+```powershell
+$env:SMOKE_DATABASE_URL = "postgresql://<user>:<encoded-password>@localhost:5432/tradewise_test"
+npm run test:smoke --workspace @tradewise/server
+Remove-Item Env:SMOKE_DATABASE_URL
+```
+
+The flow registers and logs in a generated user, partially fills an order against the local market maker, cancels its remainder, checks a risk rejection, and verifies the portfolio by replay. It deletes only its generated user and refuses any database whose name is not exactly `tradewise_test`.
 
 ## API
 
@@ -83,3 +99,71 @@ Authenticated endpoints require a bearer token in the `Authorization` header. Re
 Requests and responses use Zod schemas exported from `shared/`. Order execution is a pure TypeScript matching function; PostgreSQL transactions lock and update the wallet/position together with the order and trade records. Paise values remain safe integers in application code and are stored as `NUMERIC(20,0)` in PostgreSQL.
 
 The synthetic feed exposes `/prices`, `/quotes`, and WebSocket `/ws` at port 4000. API clients can subscribe to its validated updates at `/api/quotes/ws`. Fifteen fictional instruments are seeded across five sectors. No market prices are embedded in the React client.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser[React client] -->|HTTP and WebSocket| Proxy[Nginx container]
+  Proxy --> API[Express API]
+  API --> DB[(PostgreSQL)]
+  API --> Storage[(RustFS S3-compatible storage)]
+  API --> Feed[Synthetic quote feed]
+  API -. optional numeric-only prompt .-> Ollama[Local Ollama]
+  API -->|quotes, order events| Browser
+```
+
+## Data model
+
+```mermaid
+erDiagram
+  USERS ||--|| ACCOUNTS : owns
+  ACCOUNTS ||--o{ POSITIONS : holds
+  INSTRUMENTS ||--o{ POSITIONS : values
+  ACCOUNTS ||--o{ ORDERS : places
+  INSTRUMENTS ||--o{ ORDERS : identifies
+  ORDERS ||--o{ FILLS : executes
+  ACCOUNTS ||--o{ LEDGER_ENTRIES : records
+  FILLS o|--o{ LEDGER_ENTRIES : accounts_for
+  ORDERS ||--o{ DOMAIN_EVENTS : explains
+  ACCOUNTS ||--o{ RISK_ALERTS : receives
+  ACCOUNTS ||--o{ LEAGUE_EQUITY_SNAPSHOTS : snapshots
+  ACCOUNTS ||--o| LEAGUE_RANKINGS : ranks
+```
+
+## Order placement
+
+```mermaid
+sequenceDiagram
+  actor Trader
+  participant Client
+  participant API
+  participant DB as PostgreSQL
+  participant Engine as Matching and risk
+  Trader->>Client: Submit order
+  Client->>API: POST order + Idempotency-Key
+  API->>API: Authenticate and validate request
+  API->>DB: Begin transaction; lock account and symbol
+  API->>DB: Check idempotency and load account state
+  API->>Engine: Evaluate risk, then match eligible orders
+  Engine-->>API: Fills, remaining order, or explainable rejection
+  API->>DB: Persist order, fills, ledger and domain events
+  API->>DB: Commit
+  API-->>Client: Order result and reason, if rejected
+```
+
+### Syllabus coverage
+
+| Topic | Example implementation |
+| --- | --- |
+| ESM/CommonJS and process lifecycle | [server/src/index.ts](./server/src/index.ts), [server/src/demos/module-format-demo.mjs](./server/src/demos/module-format-demo.mjs) |
+| Filesystem, paths, and environment variables | [server/src/config/index.ts](./server/src/config/index.ts), [server/src/db/migrate.ts](./server/src/db/migrate.ts) |
+| HTTP server, event loop, and EventEmitter | [server/src/feed/index.ts](./server/src/feed/index.ts), [server/src/market/quote-stream.ts](./server/src/market/quote-stream.ts) |
+| Async/await and fetch | [server/src/market/feed-client.ts](./server/src/market/feed-client.ts) |
+| Express validation and error middleware | [server/src/app.ts](./server/src/app.ts), [server/src/http-validation.ts](./server/src/http-validation.ts), [server/src/middleware/error-handler.ts](./server/src/middleware/error-handler.ts) |
+| Authentication, authorization, bcrypt, and sanitization | [server/src/routes/auth.ts](./server/src/routes/auth.ts), [server/src/middleware/authenticate.ts](./server/src/middleware/authenticate.ts) |
+| PostgreSQL transactions and migrations | [server/src/db/transaction.ts](./server/src/db/transaction.ts), [server/src/db/migrations](./server/src/db/migrations) |
+| Matching engine, idempotency, risk, and replay | [server/src/engine](./server/src/engine), [server/src/routes/v1-orders.ts](./server/src/routes/v1-orders.ts), [server/src/services/portfolio-replay.ts](./server/src/services/portfolio-replay.ts) |
+| Streams, buffers, and object storage | [server/src/routes/v1-portfolio.ts](./server/src/routes/v1-portfolio.ts), [server/src/routes/avatar.ts](./server/src/routes/avatar.ts), [server/src/storage.ts](./server/src/storage.ts) |
+| Logging and interactive REPL | [server/src/logger.ts](./server/src/logger.ts), [server/src/repl.ts](./server/src/repl.ts) |
+| API contract and HTTP testing | [server/openapi.yaml](./server/openapi.yaml), [server/src/app.test.ts](./server/src/app.test.ts), [server/src/smoke.e2e.test.ts](./server/src/smoke.e2e.test.ts) |

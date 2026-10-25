@@ -11,6 +11,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build --workspace @tradewise/shared",
     "test": "vitest run src",
+    "test:smoke": "node scripts/run-smoke.mjs",
     "migrate": "node --import tsx src/db/migrate.ts",
     "migrate:up": "node --import tsx src/db/migrate.ts up",
     "migrate:down": "node --import tsx src/db/migrate.ts down",

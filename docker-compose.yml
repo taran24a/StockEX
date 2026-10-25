@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-tradewise}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tradewise}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - tradewise-postgres:/var/lib/postgresql/data
     healthcheck:
@@ -24,10 +24,73 @@ services:
       RUSTFS_ACCESS_KEY: ${MINIO_ACCESS_KEY:-tradewise}
       RUSTFS_SECRET_KEY: ${MINIO_SECRET_KEY:-tradewise-local}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - tradewise-minio:/data
+
+  feed:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    command: ["node", "server/dist/feed/index.js"]
+    environment:
+      NODE_ENV: development
+      FEED_PORT: 4000
+    ports:
+      - "127.0.0.1:4000:4000"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tradewise}:${POSTGRES_PASSWORD:-tradewise}@postgres:5432/${POSTGRES_DB:-tradewise}
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-before-deployment}
+      MOCK_FEED_URL: http://feed:4000
+      CLIENT_ORIGIN: http://localhost:5173
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-tradewise}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-tradewise-local}
+      MINIO_BUCKET: ${MINIO_BUCKET:-tradewise-uploads}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2:3b}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      feed:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/v1/health').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   tradewise-postgres:
