@@ -415,6 +415,65 @@ function RiskPanel() {
   );
 }
 
+function AccountGuardrailsPanel() {
+  const { token } = useAuth();
+  const rules = useQuery({
+    queryKey: ["risk", "rules"],
+    queryFn: () => apiRequest("/api/v1/risk/rules", RiskRulesSchema, token ?? undefined),
+    enabled: token !== null
+  });
+  const risk = useQuery({
+    queryKey: ["risk", "summary"],
+    queryFn: () => apiRequest("/api/v1/risk/summary", RiskSummarySchema, token ?? undefined),
+    enabled: token !== null
+  });
+
+  const largestStockPct = Math.max(0, ...(risk.data?.singleStocks ?? []).map((item) => item.concentrationPct));
+  const largestSectorPct = Math.max(0, ...(risk.data?.sectors ?? []).map((item) => item.concentrationPct));
+
+  function limitRow(label: string, currentPct: number, limitPct: number) {
+    const usagePct = Math.min(100, currentPct / limitPct * 100);
+    const tone = currentPct > limitPct ? "is-critical" : currentPct >= limitPct * 0.8 ? "is-warning" : "is-clear";
+    return (
+      <li key={label}>
+        <div className="workspace-guardrail-label"><span>{label}</span><strong>{currentPct.toFixed(1)}% <small>of {limitPct}%</small></strong></div>
+        <div className={`workspace-meter ${tone}`} role="meter" aria-label={`${label}: ${currentPct.toFixed(1)} percent of ${limitPct} percent limit`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(currentPct, 100)}>
+          <span style={{ width: `${usagePct}%` }} />
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <section aria-labelledby="guardrails-heading" className="workspace-panel workspace-guardrails-panel">
+      <div className="workspace-panel-heading">
+        <div>
+          <p className="workspace-eyebrow">Account protection</p>
+          <h2 id="guardrails-heading">Your guardrails</h2>
+        </div>
+        <Link className="workspace-subtle-link" to="/app/risk">Edit limits</Link>
+      </div>
+      {rules.isPending || risk.isPending ? <PanelSkeleton label="Loading account guardrails" /> :
+        rules.error instanceof Error ? <ErrorState message={`Risk limits could not be loaded: ${rules.error.message}`} /> :
+          risk.error instanceof Error ? <ErrorState message={`Current exposures could not be loaded: ${risk.error.message}`} /> :
+            rules.data === undefined || risk.data === undefined ? <p className="workspace-panel-state">Account guardrails are unavailable.</p> : (
+              <>
+                <div className="workspace-order-cap">
+                  <span>Maximum order size</span>
+                  <strong>{formatPaise(rules.data.maxOrderNotionalPaise)}</strong>
+                </div>
+                <div className="workspace-guardrail-section-title">Concentration limits</div>
+                <ul className="workspace-guardrail-list">
+                  {limitRow("Single stock", largestStockPct, rules.data.maxSingleStockConcentrationPct)}
+                  {limitRow("Single sector", largestSectorPct, rules.data.maxSectorConcentrationPct)}
+                </ul>
+                <p className="workspace-guardrail-note">Current exposure is measured against your account limits.</p>
+              </>
+            )}
+    </section>
+  );
+}
+
 function MarketPulsePanel() {
   const quotes = useQuery({
     queryKey: ["quotes"],
@@ -601,6 +660,7 @@ export function DashboardOverview() {
         <aside className="workspace-dashboard-secondary" aria-label="Watchlist and risk information">
           <WatchlistPanel />
           <RiskPanel />
+          <AccountGuardrailsPanel />
         </aside>
       </div>
       <p className="workspace-disclaimer">Practice with virtual money only. Market data may be delayed. This workspace is for learning, not financial advice.</p>
