@@ -2420,6 +2420,58 @@ html {
   to { background-position-x: -220%; }
 }
 
+@media (min-width: 681px) and (max-width: 850px) {
+  .workspace-sidebar {
+    position: fixed;
+    z-index: 50;
+    left: 0;
+    width: min(290px, calc(100vw - 3rem));
+    height: 100vh;
+    height: 100svh;
+    flex-basis: auto;
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform 180ms ease, visibility 0s linear 180ms;
+  }
+
+  .workspace-sidebar.is-mobile-open {
+    transform: translateX(0);
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .workspace-mobile-open,
+  .workspace-sidebar .workspace-mobile-close {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-content: center;
+    border: 1px solid #2b3b42;
+    background: #111b21;
+    color: #d4e0e1;
+    cursor: pointer;
+  }
+
+  .workspace-scrim {
+    position: fixed;
+    z-index: 49;
+    inset: 0;
+    display: block;
+    border: 0;
+    background: rgb(0 0 0 / 60%);
+  }
+
+  .workspace-topbar {
+    min-height: 68px;
+    gap: 0.75rem;
+    padding-inline: 1rem;
+  }
+
+  .workspace-content {
+    padding: 1.3rem 1.25rem 2.5rem;
+  }
+}
+
 .workspace-panel {
   padding: 1.05rem 1.15rem;
 }
