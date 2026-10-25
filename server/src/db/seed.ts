@@ -58,9 +58,9 @@ try {
       await client.query(
         `INSERT INTO positions
            (user_id, symbol, quantity, average_cost_paise, account_id, instrument_id, avg_cost)
-         SELECT $1, $2, 100000, $3, accounts.id, instruments.id, $3
+         SELECT $1, $2::text, 100000, $3, accounts.id, instruments.id, $3
          FROM accounts, instruments
-         WHERE accounts.user_id = $1 AND instruments.symbol = $2
+          WHERE accounts.user_id = $1 AND instruments.symbol = $2::text
          ON CONFLICT (user_id, symbol) DO NOTHING`,
         [botUserId, instrument.symbol, instrument.initialPricePaise]
       );
