@@ -596,11 +596,11 @@ export function DashboardOverview() {
         <div className="workspace-dashboard-primary">
           <HoldingsPanel />
           <OrdersPanel />
+          <MarketPulsePanel />
         </div>
         <aside className="workspace-dashboard-secondary" aria-label="Watchlist and risk information">
           <WatchlistPanel />
           <RiskPanel />
-          <MarketPulsePanel />
         </aside>
       </div>
       <p className="workspace-disclaimer">Practice with virtual money only. Market data may be delayed. This workspace is for learning, not financial advice.</p>
