@@ -5652,3 +5652,227 @@ html {
 .workspace-equity-empty-copy .workspace-subtle-link {
   margin-top: 0.3rem;
 }
+
+.workspace-risk-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.75rem;
+  border: 1px solid #315844;
+  border-radius: 10px;
+  background: rgb(26 52 37 / 55%);
+}
+
+.workspace-risk-status > span {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  margin-top: 0.18rem;
+  border-radius: 50%;
+  background: #8bdaa0;
+  box-shadow: 0 0 12px rgb(139 218 160 / 40%);
+}
+
+.workspace-risk-status strong {
+  color: #c9efd2;
+  font-size: 0.74rem;
+}
+
+.workspace-risk-status p,
+.workspace-risk-section-heading p {
+  margin: 0.2rem 0 0;
+  color: #a2b5aa;
+  font-size: 0.64rem;
+  line-height: 1.5;
+}
+
+.workspace-risk-status.is-warning {
+  border-color: #6e5732;
+  background: rgb(65 48 24 / 38%);
+}
+
+.workspace-risk-status.is-warning > span {
+  background: #edc36e;
+  box-shadow: 0 0 12px rgb(237 195 110 / 40%);
+}
+
+.workspace-risk-status.is-warning strong {
+  color: #f0d59c;
+}
+
+.workspace-risk-status.is-warning p {
+  color: #c7b897;
+}
+
+.workspace-risk-status.is-critical {
+  border-color: #704144;
+  background: rgb(66 31 34 / 42%);
+}
+
+.workspace-risk-status.is-critical > span {
+  background: #ed8a8d;
+  box-shadow: 0 0 12px rgb(237 138 141 / 40%);
+}
+
+.workspace-risk-status.is-critical strong {
+  color: #f2b4b6;
+}
+
+.workspace-risk-status.is-critical p {
+  color: #c7a0a2;
+}
+
+.workspace-risk-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+  color: #cbd7d9;
+  font-size: 0.67rem;
+  font-weight: 650;
+}
+
+.workspace-concentration-label strong small {
+  color: #829398;
+  font-size: 0.58rem;
+  font-weight: 500;
+}
+
+.workspace-meter {
+  position: relative;
+  overflow: visible;
+}
+
+.workspace-meter > span {
+  position: relative;
+  z-index: 1;
+  transition: width 220ms ease;
+}
+
+.workspace-meter > i {
+  position: absolute;
+  z-index: 2;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  transform: translateX(-1px);
+  background: #e2edf0;
+  box-shadow: 0 0 3px #081015;
+}
+
+.workspace-meter.is-warning > span {
+  background: linear-gradient(90deg, #ab8748, #edc36e);
+}
+
+.workspace-meter.is-critical > span {
+  background: linear-gradient(90deg, #a5575b, #ed8a8d);
+}
+
+.workspace-what-if {
+  margin-top: 0.95rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid rgb(137 158 165 / 14%);
+}
+
+.workspace-what-if-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.workspace-what-if-form label {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+  color: #a7b6bb;
+  font-size: 0.62rem;
+}
+
+.workspace-what-if-form label:first-child,
+.workspace-what-if-form button {
+  grid-column: 1 / -1;
+}
+
+.workspace-what-if-form select,
+.workspace-what-if-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid #304048;
+  border-radius: 7px;
+  background: #0b1218;
+  color: #e5edf0;
+  font-size: 0.68rem;
+}
+
+.workspace-what-if-form button {
+  min-height: 36px;
+  border: 1px solid #628775;
+  border-radius: 8px;
+  background: #20382c;
+  color: #d2f2dc;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 640;
+}
+
+.workspace-what-if-form button:hover:not(:disabled) {
+  background: #294536;
+}
+
+.workspace-what-if-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.workspace-preview-result {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+  padding: 0.7rem;
+  border: 1px solid #365a43;
+  border-radius: 9px;
+  background: #13221a;
+  color: #aab8bd;
+  font-size: 0.62rem;
+  line-height: 1.5;
+}
+
+.workspace-preview-result.is-rejected {
+  border-color: #704144;
+  background: #28191c;
+}
+
+.workspace-preview-result > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.workspace-preview-result strong {
+  color: #b3dbbe;
+  font-size: 0.68rem;
+}
+
+.workspace-preview-result.is-rejected strong,
+.workspace-preview-result.is-rejected p {
+  color: #f0aaaa;
+}
+
+.workspace-preview-result p {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 420px) {
+  .workspace-what-if-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-what-if-form label,
+  .workspace-what-if-form button {
+    grid-column: 1;
+  }
+}

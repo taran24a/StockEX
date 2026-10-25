@@ -1,16 +1,20 @@
 import {
   AiExplainResponseSchema,
   AccountPortfolioResponseSchema,
+  MarketInstrumentsResponseSchema,
   PaginatedOrdersResponseSchema,
   PortfolioPerformanceResponseSchema,
   QuotesResponseSchema,
   RiskAlertsResponseSchema,
+  RiskPreviewRequestSchema,
+  RiskPreviewResponseSchema,
+  RiskRulesSchema,
   RiskSummarySchema,
   WatchlistsResponseSchema,
   type RiskAlert
 } from "@tradewise/shared";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState, type ChangeEvent, type CSSProperties, type ReactNode } from "react";
+import { useState, type ChangeEvent, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { apiRequest } from "./api";
 import { useAuth } from "./auth";
@@ -319,19 +323,54 @@ function RiskPanel() {
   const { token } = useAuth();
   const risk = useQuery({
     queryKey: ["risk", "summary"],
-    queryFn: () => apiRequest("/api/risk/summary", RiskSummarySchema, token ?? undefined),
+    queryFn: () => apiRequest("/api/v1/risk/summary", RiskSummarySchema, token ?? undefined),
     enabled: token !== null
   });
   const alerts = useQuery({
     queryKey: ["risk", "alerts", 5, 0],
-    queryFn: () => apiRequest("/api/risk/alerts?limit=5&offset=0", RiskAlertsResponseSchema, token ?? undefined),
+    queryFn: () => apiRequest("/api/v1/risk/alerts?limit=5&offset=0", RiskAlertsResponseSchema, token ?? undefined),
     enabled: token !== null
+  });
+  const rules = useQuery({
+    queryKey: ["risk", "rules"],
+    queryFn: () => apiRequest("/api/v1/risk/rules", RiskRulesSchema, token ?? undefined),
+    enabled: token !== null
+  });
+  const instruments = useQuery({
+    queryKey: ["market", "instruments"],
+    queryFn: () => apiRequest("/api/market/instruments", MarketInstrumentsResponseSchema, token ?? undefined),
+    enabled: token !== null
+  });
+  const [selectedSymbol, setSelectedSymbol] = useState("");
+  const [previewSide, setPreviewSide] = useState<"buy" | "sell">("buy");
+  const [previewQuantity, setPreviewQuantity] = useState("1");
+  const symbol = selectedSymbol || instruments.data?.instruments[0]?.instrument.symbol || "";
+  const preview = useMutation({
+    mutationFn: () => {
+      const parsed = RiskPreviewRequestSchema.safeParse({ symbol, side: previewSide, quantity: Number(previewQuantity) });
+      if (!parsed.success) throw new Error(parsed.error.issues.map((issue) => issue.message).join("; "));
+      return apiRequest("/api/v1/risk/preview", RiskPreviewResponseSchema, token ?? undefined, {
+        method: "POST",
+        body: JSON.stringify(parsed.data)
+      });
+    }
   });
   const alertItems: RiskAlert[] = alerts.data?.alerts ?? [];
   const concentrations = [...(risk.data?.singleStocks ?? []).map((item) => ({ ...item, kind: "Stock" })),
     ...(risk.data?.sectors ?? []).map((item) => ({ ...item, kind: "Sector" }))]
     .sort((left, right) => right.concentrationPct - left.concentrationPct)
     .slice(0, 5);
+  const aboveLimitCount = risk.data?.warnings.length ?? 0;
+  const nearLimit = risk.data !== undefined && rules.data !== undefined && concentrations.some((item) => {
+    const limit = item.kind === "Stock" ? rules.data.maxSingleStockConcentrationPct : rules.data.maxSectorConcentrationPct;
+    return item.concentrationPct >= limit * 0.8 && item.concentrationPct <= limit;
+  });
+  const riskStatus = aboveLimitCount > 0 ? "is-critical" : nearLimit ? "is-warning" : "is-clear";
+
+  function submitPreview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    preview.mutate();
+  }
 
   return (
     <section aria-labelledby="risk-heading" className="workspace-panel">
@@ -342,42 +381,100 @@ function RiskPanel() {
         </div>
         <Link className="workspace-subtle-link" to="/app/risk">Risk details</Link>
       </div>
-      {risk.isPending ? <PanelSkeleton label="Loading risk summary" /> :
+      {risk.isPending || rules.isPending ? <PanelSkeleton label="Loading risk summary" /> :
         risk.error instanceof Error ? <ErrorState message={risk.error.message} /> :
-          risk.data === undefined ? <p className="workspace-panel-state">Risk data is unavailable.</p> : (
-            <>
-              {risk.data.warnings.length === 0
-                ? <p className="workspace-clear-state">No active risk warnings.</p>
-                : <ul className="workspace-warning-list">{risk.data.warnings.map((warning, index) => <li key={`${warning}-${index}`}>{warning}</li>)}</ul>}
-              {concentrations.length === 0 ? <p className="workspace-panel-state">No holdings to measure concentration.</p> : (
-                <ul className="workspace-concentration">
-                  {concentrations.map((item) => (
-                    <li key={`${item.kind}-${item.name}`}>
-                      <div className="workspace-concentration-label"><span>{item.kind} · {item.name}</span><strong>{item.concentrationPct.toFixed(1)}%</strong></div>
-                      <div aria-label={`${item.kind} ${item.name} concentration ${item.concentrationPct.toFixed(1)} percent`} className="workspace-meter">
-                        <span style={{ width: `${Math.min(item.concentrationPct, 100)}%` }} />
+          rules.error instanceof Error ? <ErrorState message={`Risk limits could not be loaded: ${rules.error.message}`} /> :
+            risk.data === undefined || rules.data === undefined ? <p className="workspace-panel-state">Risk data is unavailable.</p> : (
+              <>
+                <div className={`workspace-risk-status ${riskStatus}`} role="status">
+                  <span aria-hidden="true" />
+                  <div>
+                    <strong>{aboveLimitCount > 0 ? "Limit exceeded" : nearLimit ? "Approaching a limit" : "Within your limits"}</strong>
+                    <p>{aboveLimitCount > 0
+                      ? `${aboveLimitCount} concentration warning${aboveLimitCount === 1 ? "" : "s"} need review.`
+                      : nearLimit
+                        ? "An exposure is within 20% of its configured limit."
+                        : "No stock or sector concentration limits are currently exceeded."}</p>
+                  </div>
+                </div>
+                {risk.data.warnings.length > 0 && <ul className="workspace-warning-list">{risk.data.warnings.map((warning, index) => <li key={`${warning}-${index}`}>{warning}</li>)}</ul>}
+                <div className="workspace-risk-section-heading">
+                  <span>Top exposures</span>
+                  <Link className="workspace-subtle-link" to="/app/risk">Limits &amp; alerts</Link>
+                </div>
+                {concentrations.length === 0 ? (
+                  <p className="workspace-panel-state">No open positions yet. Try a hypothetical order below to preview its impact.</p>
+                ) : (
+                  <ul className="workspace-concentration">
+                    {concentrations.map((item) => {
+                      const limit = item.kind === "Stock" ? rules.data.maxSingleStockConcentrationPct : rules.data.maxSectorConcentrationPct;
+                      const tone = item.concentrationPct > limit ? "is-critical" : item.concentrationPct >= limit * 0.8 ? "is-warning" : "is-clear";
+                      return (
+                        <li key={`${item.kind}-${item.name}`}>
+                          <div className="workspace-concentration-label"><span>{item.kind} · {item.name}</span><strong>{item.concentrationPct.toFixed(1)}% <small>of {limit}%</small></strong></div>
+                          <div aria-label={`${item.kind} ${item.name} concentration ${item.concentrationPct.toFixed(1)} percent, limit ${limit} percent`} className={`workspace-meter ${tone}`} role="meter" aria-valuemax={100} aria-valuemin={0} aria-valuenow={Math.min(item.concentrationPct, 100)} aria-valuetext={`${item.concentrationPct.toFixed(1)} percent of equity; limit ${limit} percent`}>
+                            <span style={{ width: `${Math.min(item.concentrationPct, 100)}%` }} />
+                            <i aria-hidden="true" style={{ left: `${limit}%` }} />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <div className="workspace-alert-summary">
+                  <span>Recent risk alerts</span>
+                  {alerts.isPending ? <span role="status">Loading…</span> :
+                    alerts.error instanceof Error ? <span className="is-loss">Alerts unavailable</span> :
+                      alertItems.length === 0 ? <span>No alerts</span> :
+                        <span>{alertItems.filter((alert) => alert.acknowledgedAt === null).length} unacknowledged · {alertItems.length} shown</span>}
+                </div>
+                {!alerts.isPending && alerts.error instanceof Error && <ErrorState message={alerts.error.message} />}
+                {!alerts.isPending && alerts.error === null && alertItems.length > 0 && (
+                  <ul className="workspace-risk-alerts">
+                    {alertItems.slice(0, 3).map((alert) => (
+                      <li key={alert.id}><span className={`workspace-severity is-${alert.severity}`} />{alert.message}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="workspace-what-if">
+                  <div className="workspace-risk-section-heading">
+                    <div><span>Practice preview</span><p>No order will be placed</p></div>
+                  </div>
+                  {instruments.isPending ? <PanelSkeleton label="Loading instruments for risk preview" /> :
+                    instruments.error instanceof Error ? <ErrorState message={`Instruments could not be loaded: ${instruments.error.message}`} /> : (
+                      <form className="workspace-what-if-form" onSubmit={submitPreview}>
+                        <label><span>Instrument</span>
+                          <select onChange={(event) => { setSelectedSymbol(event.target.value); preview.reset(); }} value={symbol}>
+                            {instruments.data?.instruments.length === 0 && <option value="">No instruments available</option>}
+                            {instruments.data?.instruments.map(({ instrument }) => <option key={instrument.id} value={instrument.symbol}>{instrument.symbol}</option>)}
+                          </select>
+                        </label>
+                        <label><span>Side</span>
+                          <select onChange={(event) => { setPreviewSide(event.target.value as "buy" | "sell"); preview.reset(); }} value={previewSide}>
+                            <option value="buy">Buy</option><option value="sell">Sell</option>
+                          </select>
+                        </label>
+                        <label><span>Quantity</span>
+                          <input min="1" onChange={(event) => { setPreviewQuantity(event.target.value); preview.reset(); }} step="1" type="number" value={previewQuantity} />
+                        </label>
+                        <button className="workspace-button" disabled={preview.isPending || symbol === ""} type="submit">
+                          {preview.isPending ? "Checking…" : "Preview impact"}
+                        </button>
+                      </form>
+                    )}
+                  {preview.error instanceof Error && <ErrorState message={`Preview could not be calculated: ${preview.error.message}`} />}
+                  {preview.data !== undefined && (
+                    <div className={`workspace-preview-result ${preview.data.rejection === null ? "is-allowed" : "is-rejected"}`} role="status">
+                      <div><strong>{preview.data.rejection === null ? "Within configured limits" : "Would exceed a limit"}</strong>
+                        <span>{preview.data.side.toUpperCase()} {preview.data.quantity.toLocaleString("en-IN")} {preview.data.symbol} · {formatPaise(preview.data.orderNotionalPaise)}</span>
+                        {preview.data.rejection !== null && <p>{preview.data.rejection}</p>}
                       </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="workspace-alert-summary">
-                <span>Recent risk alerts</span>
-                {alerts.isPending ? <span role="status">Loading…</span> :
-                  alerts.error instanceof Error ? <span className="is-loss">Alerts unavailable</span> :
-                    alertItems.length === 0 ? <span>No alerts</span> :
-                      <span>{alertItems.filter((alert) => alert.acknowledgedAt === null).length} unacknowledged · {alertItems.length} shown</span>}
-              </div>
-              {!alerts.isPending && alerts.error instanceof Error && <ErrorState message={alerts.error.message} />}
-              {!alerts.isPending && alerts.error === null && alertItems.length > 0 && (
-                <ul className="workspace-risk-alerts">
-                  {alertItems.slice(0, 3).map((alert) => (
-                    <li key={alert.id}><span className={`workspace-severity is-${alert.severity}`} />{alert.message}</li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
+                      <p>Stock {preview.data.currentStockPct.toFixed(1)}% → {preview.data.projectedStockPct.toFixed(1)}%<br />Sector {preview.data.currentSectorPct.toFixed(1)}% → {preview.data.projectedSectorPct.toFixed(1)}%</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
     </section>
   );
 }

@@ -113,7 +113,7 @@ function Notifications({
   const { token } = useAuth();
   const alerts = useQuery({
     queryKey: ["risk", "alerts", 5, 0],
-    queryFn: () => apiRequest("/api/risk/alerts?limit=5&offset=0", RiskAlertsResponseSchema, token ?? undefined),
+    queryFn: () => apiRequest("/api/v1/risk/alerts?limit=5&offset=0", RiskAlertsResponseSchema, token ?? undefined),
     enabled: token !== null
   });
   const activeAlerts = (alerts.data?.alerts ?? []).filter((alert) => alert.acknowledgedAt === null);
@@ -190,7 +190,7 @@ function WorkspaceTopbar({
   });
   const alerts = useQuery({
     queryKey: ["risk", "alerts", 5, 0],
-    queryFn: () => apiRequest("/api/risk/alerts?limit=5&offset=0", RiskAlertsResponseSchema, token ?? undefined),
+    queryFn: () => apiRequest("/api/v1/risk/alerts?limit=5&offset=0", RiskAlertsResponseSchema, token ?? undefined),
     enabled: token !== null
   });
   const activeAlertCount = (alerts.data?.alerts ?? []).filter((alert) => alert.acknowledgedAt === null).length;

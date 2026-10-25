@@ -193,7 +193,7 @@ export function PortfolioPage() {
   });
   const riskSummary = useQuery({
     queryKey: ["risk", "summary"],
-    queryFn: () => apiRequest("/api/risk/summary", RiskSummarySchema, token ?? undefined),
+    queryFn: () => apiRequest("/api/v1/risk/summary", RiskSummarySchema, token ?? undefined),
     enabled: token !== null,
     refetchInterval: 30_000
   });
