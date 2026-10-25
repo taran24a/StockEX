@@ -2178,6 +2178,53 @@ html {
   gap: 1rem;
 }
 
+.workspace-dashboard-welcome {
+  display: flex;
+  min-height: 148px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.45rem 1.6rem;
+  border: 1px solid #314c48;
+  background:
+    radial-gradient(ellipse at 88% 0%, rgb(79 137 112 / 22%), transparent 38%),
+    linear-gradient(112deg, #14231f 0%, #111c21 62%, #142329 100%);
+}
+
+.workspace-dashboard-welcome h2 {
+  margin: 0.42rem 0 0.35rem;
+  color: #edf5f1;
+  font-size: clamp(1.2rem, 2vw, 1.65rem);
+  font-weight: 640;
+  letter-spacing: -0.045em;
+}
+
+.workspace-dashboard-welcome > div > p:last-child {
+  margin: 0;
+  color: #a0b0ad;
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.workspace-dashboard-market-link {
+  flex: 0 0 auto;
+  gap: 0.55rem;
+  margin-top: 0;
+  padding-inline: 1rem;
+  border-color: #628775;
+  background: #20382c;
+  color: #d2f2dc !important;
+}
+
+.workspace-dashboard-market-link:hover {
+  border-color: #8ab79d;
+  background: #294536;
+}
+
+.workspace-dashboard-market-link span {
+  font-size: 0.9rem;
+}
+
 .workspace-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2195,6 +2242,12 @@ html {
   position: relative;
   min-height: 116px;
   padding: 1rem 1.05rem;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.workspace-metric:hover {
+  transform: translateY(-2px);
+  border-color: #426158;
 }
 
 .workspace-metric::before {
@@ -2787,6 +2840,18 @@ html {
 }
 
 @media (max-width: 680px) {
+  .workspace-dashboard-welcome {
+    min-height: 0;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.15rem;
+  }
+
+  .workspace-dashboard-market-link {
+    min-height: 36px;
+  }
+
   .workspace-sidebar {
     position: fixed;
     z-index: 50;

@@ -366,7 +366,7 @@ function RiskPanel() {
 }
 
 export function DashboardOverview() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const portfolio = useQuery({
     queryKey: ["portfolio"],
     queryFn: () => apiRequest("/api/v1/portfolio", AccountPortfolioResponseSchema, token ?? undefined),
@@ -398,9 +398,21 @@ export function DashboardOverview() {
     ? portfolio.data.cashBalancePaise / allocationBasePaise * 100
     : 0;
   const investedSharePct = allocationBasePaise > 0 ? 100 - cashSharePct : 0;
+  const firstName = user?.displayName.trim().split(/\s+/)[0] ?? "Trader";
 
   return (
     <div className="workspace-dashboard">
+      <section aria-labelledby="dashboard-welcome-heading" className="workspace-dashboard-welcome">
+        <div>
+          <p className="workspace-eyebrow">Your trading desk</p>
+          <h2 id="dashboard-welcome-heading">Welcome back, {firstName}</h2>
+          <p>Track your virtual portfolio, review recent activity, and explore the market.</p>
+        </div>
+        <Link className="workspace-button-link workspace-dashboard-market-link" to="/app/markets">
+          Explore markets <span aria-hidden="true">↗</span>
+        </Link>
+      </section>
+
       <section aria-label="Portfolio metrics" className="workspace-metrics">
         <Metric label="Total equity" value={portfolio.data?.totalEquityPaise} loading={portfolio.isPending} error={portfolioError} />
         <Metric label="Cash balance" value={portfolio.data?.cashBalancePaise} loading={portfolio.isPending} error={portfolioError} />
