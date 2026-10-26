@@ -69,6 +69,87 @@ try {
       console.info("Seeded 90 days of synthetic daily price history for the practice charts");
     }
 
+    const intradayInstruments = await client.query<{
+      id: string;
+      symbol: string;
+      last_price: string | number;
+    }>(
+      `SELECT instrument.id, instrument.symbol, instrument.last_price
+       FROM instruments AS instrument
+       WHERE (
+         SELECT COUNT(*)
+         FROM candles
+         WHERE instrument_id = instrument.id
+           AND ts >= NOW() - INTERVAL '7 days'
+           AND ts > date_trunc('day', ts)
+       ) < 10000`
+    );
+    const candleBatch: Array<[string, string, number, number, number, number, number]> = [];
+    const insertCandleBatch = async (): Promise<void> => {
+      if (candleBatch.length === 0) {
+        return;
+      }
+      const values: Array<string | number> = [];
+      const tuples = candleBatch.map((candle, index) => {
+        values.push(...candle);
+        const firstParameter = index * 7 + 1;
+        return `(${Array.from({ length: 7 }, (_unused, offset) => `$${firstParameter + offset}`).join(", ")})`;
+      });
+      await client.query(
+        `INSERT INTO candles (instrument_id, ts, open, high, low, close, volume)
+         VALUES ${tuples.join(", ")}
+         ON CONFLICT (instrument_id, ts) DO NOTHING`,
+        values
+      );
+      candleBatch.length = 0;
+    };
+    const intradayEnd = new Date();
+    intradayEnd.setUTCSeconds(0, 0);
+    const intradayStart = new Date(intradayEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    for (const instrument of intradayInstruments.rows) {
+      const priorCandle = await client.query<{ close: string | number }>(
+        `SELECT close
+         FROM candles
+         WHERE instrument_id = $1 AND ts < $2
+         ORDER BY ts DESC
+         LIMIT 1`,
+        [instrument.id, intradayStart.toISOString()]
+      );
+      let previousClose = Number(priorCandle.rows[0]?.close ?? instrument.last_price);
+
+      for (let minute = 0; minute <= 7 * 24 * 60; minute += 1) {
+        const timestamp = new Date(intradayStart.getTime() + minute * 60_000);
+        if (timestamp.getUTCHours() === 0 && timestamp.getUTCMinutes() === 0) {
+          continue;
+        }
+        const open = previousClose;
+        const movementBps = randomInteger(10) - 5;
+        const close = Math.max(1, open + Number(BigInt(open) * BigInt(movementBps) / 10_000n));
+        const spread = Math.max(1, Math.floor(open / 100_000));
+        const high = Math.max(open, close) + randomInteger(spread);
+        const low = Math.max(1, Math.min(open, close) - randomInteger(spread));
+        candleBatch.push([
+          instrument.id,
+          timestamp.toISOString(),
+          open,
+          high,
+          low,
+          close,
+          randomInteger(10_000)
+        ]);
+        previousClose = close;
+
+        if (candleBatch.length >= 500) {
+          await insertCandleBatch();
+        }
+      }
+    }
+    await insertCandleBatch();
+    if (intradayInstruments.rows.length > 0) {
+      console.info("Seeded 7 days of synthetic one-minute price history for intraday charts");
+    }
+
     const botPasswordHash = await bcrypt.hash(randomUUID(), 12);
     const botUser = await client.query<{ id: string }>(
       `INSERT INTO users (email, display_name, password_hash, role)

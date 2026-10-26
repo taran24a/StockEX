@@ -458,7 +458,7 @@ export function MarketDetailPage() {
   const { symbol: pathSymbol } = useParams();
   const symbol = pathSymbol?.toUpperCase() ?? "";
   const { token } = useAuth();
-  const interval = "1d";
+  const [interval, setInterval] = useState<"1m" | "5m" | "15m" | "1h" | "4h" | "1d">("1d");
   const instruments = useQuery({
     queryKey: ["market", "instruments"],
     queryFn: () => apiRequest("/api/market/instruments", MarketInstrumentsResponseSchema, token ?? undefined),
@@ -506,9 +506,20 @@ export function MarketDetailPage() {
         <section aria-labelledby="market-chart-heading" className="workspace-panel market-chart-panel">
           <div className="market-panel-heading">
             <div><p className="workspace-eyebrow">Historical prices</p><h2 id="market-chart-heading">Price chart</h2></div>
-            <div className="market-interval-select"><span>Chart interval</span><strong>1 day</strong></div>
+            <label className="market-interval-select"><span>Chart interval</span>
+              <select aria-label="Chart interval" onChange={(event) => setInterval(event.target.value as typeof interval)} value={interval}>
+                {([
+                  ["1m", "1 minute"],
+                  ["5m", "5 minutes"],
+                  ["15m", "15 minutes"],
+                  ["1h", "1 hour"],
+                  ["4h", "4 hours"],
+                  ["1d", "1 day"]
+                ] as const).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
           </div>
-          <p className="market-chart-note">Synthetic daily prices for practice; this is not real market history.</p>
+          <p className="market-chart-note">Synthetic prices for practice; not real market history. Intraday intervals show the last 7 days.</p>
           {candles.isPending ? <QueryMessage>Loading candle data…</QueryMessage> :
             candles.error instanceof Error ? <QueryMessage error>Candles could not be loaded: {candles.error.message}</QueryMessage> :
               candles.data === undefined ? <QueryMessage error>Candle data could not be loaded.</QueryMessage> : (

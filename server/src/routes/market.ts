@@ -121,6 +121,10 @@ export function createMarketRouter(pool: Pool, feedUrl: string): Router {
                 SUM(volume) AS volume
          FROM candles
          WHERE instrument_id = $1
+           AND ($4::boolean OR (
+             ts >= NOW() - INTERVAL '7 days'
+             AND ts > date_trunc('day', ts)
+           ))
          GROUP BY 1
          ORDER BY 1 DESC
          LIMIT $3
@@ -128,7 +132,7 @@ export function createMarketRouter(pool: Pool, feedUrl: string): Router {
        SELECT $1::uuid AS instrument_id, ts, open, high, low, close, volume
        FROM buckets
        ORDER BY ts ASC`,
-      [instrumentId, intervalSql[interval], limit]
+      [instrumentId, intervalSql[interval], limit, interval === "1d"]
     );
     const candles = result.rows.map((row) => CandleSchema.parse({
       instrumentId: row.instrument_id,

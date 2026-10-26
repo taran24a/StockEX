@@ -129,7 +129,8 @@ describe("market candle route", () => {
     expect(query.mock.calls[1]?.[1]).toEqual([
       "e246e1cb-8d22-4e59-b139-8fbaf801874d",
       "1 day",
-      10
+      10,
+      true
     ]);
   });
 });
