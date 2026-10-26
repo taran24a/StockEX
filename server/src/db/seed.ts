@@ -13,6 +13,10 @@ const seedUsers = [
 ] as const;
 const marketMakerEmail = "liquidity-bot@tradewise.internal";
 
+function randomInteger(max: number): number {
+  return Math.floor(Math.random() * (max + 1));
+}
+
 try {
   await withTransaction(pool, async (client) => {
     for (const instrument of marketInstruments) {
@@ -23,6 +27,46 @@ try {
          SET name = EXCLUDED.name, sector = EXCLUDED.sector, tick_size = EXCLUDED.tick_size`,
         [instrument.symbol, instrument.name, instrument.sector, instrument.initialPricePaise]
       );
+    }
+
+    const existingCandles = await client.query<{ has_candles: boolean }>(
+      "SELECT EXISTS (SELECT 1 FROM candles) AS has_candles"
+    );
+    if (existingCandles.rows[0]?.has_candles !== true) {
+      const seededInstruments = await client.query<{ id: string; symbol: string }>(
+        "SELECT id, symbol FROM instruments"
+      );
+      const instrumentIds = new Map(seededInstruments.rows.map(({ id, symbol }) => [symbol, id]));
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+
+      for (const instrument of marketInstruments) {
+        const instrumentId = instrumentIds.get(instrument.symbol);
+        if (instrumentId === undefined) {
+          throw new Error(`Could not seed synthetic candles for ${instrument.symbol}`);
+        }
+        let previousClose = instrument.initialPricePaise;
+
+        for (let daysAgo = 89; daysAgo >= 0; daysAgo -= 1) {
+          const timestamp = new Date(today);
+          timestamp.setUTCDate(today.getUTCDate() - daysAgo);
+          const open = previousClose;
+          const movementBps = randomInteger(400) - 200;
+          const close = Math.max(1, open + Number(BigInt(open) * BigInt(movementBps) / 10_000n));
+          const spread = Math.max(1, Math.floor(open / 200));
+          const high = Math.max(open, close) + randomInteger(spread);
+          const low = Math.max(1, Math.min(open, close) - randomInteger(spread));
+
+          await client.query(
+            `INSERT INTO candles (instrument_id, ts, open, high, low, close, volume)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (instrument_id, ts) DO NOTHING`,
+            [instrumentId, timestamp.toISOString(), open, high, low, close, randomInteger(1_000_000)]
+          );
+          previousClose = close;
+        }
+      }
+      console.info("Seeded 90 days of synthetic daily price history for the practice charts");
     }
 
     const botPasswordHash = await bcrypt.hash(randomUUID(), 12);

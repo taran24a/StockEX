@@ -458,7 +458,7 @@ export function MarketDetailPage() {
   const { symbol: pathSymbol } = useParams();
   const symbol = pathSymbol?.toUpperCase() ?? "";
   const { token } = useAuth();
-  const [interval, setInterval] = useState<"1m" | "5m" | "15m" | "1h" | "4h" | "1d">("1d");
+  const interval = "1d";
   const instruments = useQuery({
     queryKey: ["market", "instruments"],
     queryFn: () => apiRequest("/api/market/instruments", MarketInstrumentsResponseSchema, token ?? undefined),
@@ -506,12 +506,9 @@ export function MarketDetailPage() {
         <section aria-labelledby="market-chart-heading" className="workspace-panel market-chart-panel">
           <div className="market-panel-heading">
             <div><p className="workspace-eyebrow">Historical prices</p><h2 id="market-chart-heading">Price chart</h2></div>
-            <label className="market-interval-select"><span>Chart interval</span>
-              <select aria-label="Chart interval" onChange={(event) => setInterval(event.target.value as typeof interval)} value={interval}>
-                {(["1m", "5m", "15m", "1h", "4h", "1d"] as const).map((value) => <option key={value} value={value}>{value}</option>)}
-              </select>
-            </label>
+            <div className="market-interval-select"><span>Chart interval</span><strong>1 day</strong></div>
           </div>
+          <p className="market-chart-note">Synthetic daily prices for practice; this is not real market history.</p>
           {candles.isPending ? <QueryMessage>Loading candle data…</QueryMessage> :
             candles.error instanceof Error ? <QueryMessage error>Candles could not be loaded: {candles.error.message}</QueryMessage> :
               candles.data === undefined ? <QueryMessage error>Candle data could not be loaded.</QueryMessage> : (

@@ -3910,6 +3910,23 @@ html {
   padding-block: 0.35rem;
 }
 
+.market-interval-select strong {
+  min-height: 34px;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #304048;
+  border-radius: 2px;
+  background: #0b1218;
+  color: #e5edf0;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.market-chart-note {
+  margin: 0 0 0.55rem;
+  color: #a5b3b8;
+  font-size: 0.72rem;
+}
+
 .market-chart {
   width: 100%;
   min-height: 320px;
