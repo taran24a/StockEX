@@ -45,7 +45,7 @@ try {
         if (instrumentId === undefined) {
           throw new Error(`Could not seed synthetic candles for ${instrument.symbol}`);
         }
-        let previousClose = instrument.initialPricePaise;
+        let previousClose: number = instrument.initialPricePaise;
 
         for (let daysAgo = 89; daysAgo >= 0; daysAgo -= 1) {
           const timestamp = new Date(today);
