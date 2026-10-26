@@ -10,7 +10,7 @@ import { Button, Input } from "./components/ui";
 interface AuthFormProps {
   onLogin(input: LoginRequest): Promise<void>;
   onRegister(input: RegisterRequest): Promise<void>;
-  onGoogleSignIn(credential: string): Promise<void>;
+  onGoogleSignIn?(credential: string): Promise<void>;
   initialMode?: "login" | "register";
   showModeToggle?: boolean;
 }
@@ -80,10 +80,14 @@ function passwordStrength(password: string): { label: string; value: number; wid
   return { label: "Strong", value: 3, width: "100%" };
 }
 
+async function unavailableGoogleSignIn(): Promise<void> {
+  throw new Error("Google sign-in is not available on this page");
+}
+
 export function AuthForm({
   onLogin,
   onRegister,
-  onGoogleSignIn,
+  onGoogleSignIn = unavailableGoogleSignIn,
   initialMode = "login",
   showModeToggle = true
 }: AuthFormProps) {

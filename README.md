@@ -29,6 +29,10 @@ The scaffold uses npm workspaces (`shared/`, `server/`, and `client/`). Root scr
 
 New accounts receive **100,000,000 paise (₹1,000,000)** in virtual cash. Local credentials in `.env.server.example` are for development only; set a unique `JWT_SECRET` and service credentials before deployment. Keep `.env` out of version control.
 
+### Google sign-in
+
+Google sign-in is available on the login and registration pages after you configure a Google Identity Services **Web application client ID**. Set the same value as `GOOGLE_CLIENT_ID` in the root `.env` (API verification) and `VITE_GOOGLE_CLIENT_ID` in `client/.env` (Google button), then rebuild/restart the stack with `docker compose up --build -d`. For the Compose setup, the root `GOOGLE_CLIENT_ID` is passed to both services. Add `http://localhost:5173` to the authorized JavaScript origins in Google Cloud for local development. Apply the new database migration with `docker compose exec api node server/dist/db/migrate.js up`. Until a client ID is configured, the Google button is shown as setup-required and cannot be used.
+
 ### PostgreSQL password troubleshooting
 
 `password authentication failed` means PostgreSQL rejected the user/password in `DATABASE_URL`; the migration has not run yet. Ensure `DATABASE_URL` uses the same username, password, and database as `POSTGRES_USER`, `POSTGRES_PASSWORD`, and `POSTGRES_DB` in the root `.env`. The checked-in examples use matching local-only defaults.
