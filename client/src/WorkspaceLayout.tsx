@@ -8,6 +8,7 @@ import { DashboardOverview, WorkspaceStub } from "./DashboardOverview";
 import { formatPaise } from "./format";
 import { useQuotesSocket } from "./hooks/useQuotesSocket";
 import { Spinner } from "./components/ui";
+import { TradeWiseLogo } from "./components/TradeWiseLogo";
 
 const MarketsPage = lazy(() => import("./Markets").then((module) => ({ default: module.MarketsPage })));
 const MarketDetailPage = lazy(() => import("./Markets").then((module) => ({ default: module.MarketDetailPage })));
@@ -36,11 +37,10 @@ const pageTitles: Record<string, string> = {
   "/app/profile": "Profile"
 };
 
-function Brand() {
+function Brand({ iconOnly }: { iconOnly: boolean }) {
   return (
     <Link aria-label="TradeWise workspace home" className="workspace-brand" to="/app/dashboard">
-      <span aria-hidden="true" className="workspace-brand-mark">TW</span>
-      <span className="workspace-brand-name">TradeWise</span>
+      <TradeWiseLogo className="workspace-logo" iconOnly={iconOnly} />
     </Link>
   );
 }
@@ -68,7 +68,7 @@ function Sidebar({
       {mobileOpen && <button aria-label="Close navigation" className="workspace-scrim" onClick={onClose} type="button" />}
       <aside aria-label="Workspace sidebar" className={`workspace-sidebar ${collapsed ? "is-collapsed" : ""} ${mobileOpen ? "is-mobile-open" : ""}`} ref={sidebarRef}>
         <div className="workspace-sidebar-header">
-          <Brand />
+          <Brand iconOnly={collapsed} />
           <button aria-label="Close navigation" className="workspace-mobile-close" onClick={onClose} type="button">×</button>
         </div>
         <nav aria-label="Workspace navigation" className="workspace-nav">

@@ -14,8 +14,10 @@ import {
 } from "@tradewise/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { apiRequest } from "./api";
 import { useAuth } from "./auth";
+import { TradeWiseLogo } from "./components/TradeWiseLogo";
 import { formatPaise } from "./format";
 
 const pageSize = 20;
@@ -347,6 +349,10 @@ export function AdminPage() {
   }
   return (
     <main className="admin-workspace">
+      <nav aria-label="Admin navigation" className="admin-topbar">
+        <Link aria-label="TradeWise home" className="admin-brand" to="/"><TradeWiseLogo className="admin-logo" /><span>OPERATIONS</span></Link>
+        <Link className="admin-back-link" to="/app/dashboard">Back to workspace <span aria-hidden="true">↗</span></Link>
+      </nav>
       <header className="admin-page-heading">
         <p className="admin-eyebrow">Platform operations</p>
         <h1>Admin workspace</h1>

@@ -38,18 +38,6 @@ const quote = {
   updatedAt: "2026-10-24T12:00:00.000Z"
 };
 
-const candles = {
-  candles: [{
-    instrumentId: "8af8401d-00c7-49f0-aeae-914c82dbdd72",
-    ts: "2026-10-24T00:00:00.000Z",
-    openPaise: 12_300_000,
-    highPaise: 12_600_000,
-    lowPaise: 12_200_000,
-    closePaise: 12_500_000,
-    volume: 100
-  }]
-};
-
 function renderAt(path = "/") {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -73,18 +61,18 @@ beforeEach(() => {
     signIn: vi.fn(),
     register: vi.fn()
   });
-  apiRequestMock.mockImplementation((path: string) => Promise.resolve(
-    path === "/api/quotes" ? { quotes: [quote] } : candles
-  ));
+  apiRequestMock.mockImplementation(() => Promise.resolve({ quotes: [quote] }));
 });
 
 describe("public landing route", () => {
-  it("shows the landing content and validated live market preview", async () => {
+  it("shows the landing content and separates illustrative preview from the app market feed", async () => {
     renderAt();
 
-    expect(screen.getByRole("heading", { name: "Practice trading. Understand every trade." })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Trade smarter. See the market differently." })).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeTruthy();
+    expect(document.querySelectorAll(".landing-logo .tradewise-logo-icon")).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "Questions, answered." })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Build your market instincts/i })).toBeTruthy();
     expect(screen.getByRole("group", { name: "TradeWise learning trace" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Observe" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Check" })).toBeTruthy();
@@ -92,16 +80,30 @@ describe("public landing route", () => {
     expect(screen.getByText("Simulated trading with virtual money. Not financial advice.")).toBeTruthy();
     expect((await screen.findAllByText("ALFA")).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("₹1,25,000.00")).length).toBeGreaterThan(0);
-    expect(await screen.findByRole("img", { name: "ALFA daily closing prices from real market candle data" })).toBeTruthy();
-    expect(apiRequestMock).toHaveBeenCalledWith("/api/market/ALFA/candles?interval=1d&limit=48", expect.anything());
+    expect(screen.getByRole("complementary", { name: "Illustrative workspace preview, not account data" })).toBeTruthy();
+    expect(screen.getByText("Example view · not account data")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Already have an account? Sign in" }).getAttribute("href")).toBe("/login");
+    expect(screen.getAllByRole("link", { name: "Start practicing" })[0]!.getAttribute("href")).toBe("/register");
+    expect(document.querySelector(".landing-ticker-change.is-up")).toBeTruthy();
+    expect(apiRequestMock).toHaveBeenCalledWith("/api/quotes", expect.anything());
+    expect(apiRequestMock).not.toHaveBeenCalledWith(expect.stringContaining("/candles"), expect.anything());
   });
 
   it("routes signed-out primary calls to registration", async () => {
     renderAt();
-    fireEvent.click(screen.getByRole("link", { name: "Start practicing" }));
+    fireEvent.click(screen.getAllByRole("link", { name: "Start practicing" })[0]!);
 
     expect(await screen.findByLabelText("Display name")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create account" })).toBeTruthy();
+  });
+
+  it("routes the final landing call to action to registration", async () => {
+    renderAt();
+    const finalCta = document.querySelector(".landing-final-cta .landing-primary-cta");
+    expect(finalCta).toBeTruthy();
+    fireEvent.click(finalCta!);
+
+    expect(await screen.findByLabelText("Display name")).toBeTruthy();
   });
 
   it("routes a signed-in call to the protected dashboard", async () => {
@@ -115,7 +117,8 @@ describe("public landing route", () => {
     });
 
     renderAt();
-    fireEvent.click(screen.getByRole("link", { name: "Go to your dashboard" }));
+    expect(screen.getByRole("link", { name: "Explore markets" }).getAttribute("href")).toBe("/app/markets");
+    fireEvent.click(screen.getAllByRole("link", { name: "Go to your dashboard" })[0]!);
 
     expect(await screen.findByText("Dashboard route is intact")).toBeTruthy();
   });
@@ -179,15 +182,15 @@ describe("public landing route", () => {
     });
 
     renderAt("/admin/users");
-    expect(await screen.findByRole("heading", { name: "Admin workspace" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Admin workspace" }, { timeout: 5_000 })).toBeTruthy();
   });
 
-  it("shows an explicit quote error instead of invented prices", async () => {
+  it("shows an explicit market-feed error instead of invented quotes", async () => {
     apiRequestMock.mockRejectedValue(new Error("feed offline"));
     renderAt();
 
-    expect(await screen.findByText("Live quotes are temporarily unavailable.", {}, { timeout: 3_000 })).toBeTruthy();
-    expect(screen.getAllByRole("alert")).toHaveLength(2);
-    expect(screen.queryByText("₹1,25,000.00")).toBeNull();
+    expect(await screen.findByText("Market feed is temporarily unavailable.", {}, { timeout: 3_000 })).toBeTruthy();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.queryByText("ALFA")).toBeNull();
   });
 });

@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { CandlesResponseSchema, QuotesResponseSchema } from "@tradewise/shared";
+import { QuotesResponseSchema } from "@tradewise/shared";
 import { Link } from "react-router-dom";
 import { apiRequest } from "./api";
 import { useAuth } from "./auth";
-import { LivePriceChart, type PricePoint } from "./LivePriceChart";
+import { TradeWiseLogo } from "./components/TradeWiseLogo";
 import { formatPaise } from "./format";
 
 const quoteQueryKey = ["landing", "quotes"];
@@ -15,22 +15,6 @@ function getChangeLabel(changePaise: number): string {
   return `${changePaise > 0 ? "Up" : "Down"} ${formatPaise(Math.abs(changePaise))}`;
 }
 
-function EmptyChartState({ symbol }: { symbol: string }) {
-  return (
-    <div className="landing-empty-chart" role="status">
-      <svg aria-hidden="true" className="landing-empty-chart-art" viewBox="0 0 420 170" preserveAspectRatio="none">
-        <path d="M0 34.5h420M0 84.5h420M0 134.5h420" />
-        <path className="landing-empty-chart-baseline" d="M0 153.5h420" />
-      </svg>
-      <div className="landing-empty-chart-copy">
-        <span aria-hidden="true" className="landing-empty-chart-icon">⌁</span>
-        <p>Price history is warming up</p>
-        <span>Daily candles for {symbol} will appear here.</span>
-      </div>
-    </div>
-  );
-}
-
 function QuoteTicker() {
   const query = useQuery({
     queryKey: quoteQueryKey,
@@ -40,16 +24,16 @@ function QuoteTicker() {
   const quotes = query.data?.quotes ?? [];
 
   return (
-    <section aria-label="Live market quotes" className="landing-ticker">
+    <section aria-label="Application market feed" className="landing-ticker">
       <div className="landing-ticker-label">
         <span aria-hidden="true" className="landing-live-dot" />
-        <span>Market pulse</span>
+        <span>App market feed</span>
       </div>
       {query.isPending ? (
-        <p className="landing-ticker-state" role="status">Loading live quotes…</p>
+        <p className="landing-ticker-state" role="status">Loading market feed…</p>
       ) : query.isError ? (
         <p className="landing-ticker-state landing-error" role="alert">
-          Live quotes are temporarily unavailable.
+          Market feed is temporarily unavailable.
         </p>
       ) : quotes.length === 0 ? (
         <p className="landing-ticker-state">No market quotes are available right now.</p>
@@ -75,76 +59,36 @@ function QuoteTicker() {
 }
 
 function MarketPreview() {
-  const quotesQuery = useQuery({
-    queryKey: quoteQueryKey,
-    queryFn: () => apiRequest("/api/quotes", QuotesResponseSchema),
-    refetchInterval: 10_000
-  });
-  const quote = quotesQuery.data?.quotes[0];
-  const symbol = quote?.symbol;
-  const candlesQuery = useQuery({
-    queryKey: ["landing", "candles", symbol],
-    queryFn: () => apiRequest(
-      `/api/market/${encodeURIComponent(symbol ?? "")}/candles?interval=1d&limit=48`,
-      CandlesResponseSchema
-    ),
-    enabled: symbol !== undefined,
-    staleTime: 60_000
-  });
-  const candles = candlesQuery.data?.candles ?? [];
-  const chartData: PricePoint[] = candles.map((candle) => ({
-    time: Math.floor(Date.parse(candle.ts) / 1000) as PricePoint["time"],
-    value: candle.closePaise
-  }));
-
-  let chartState;
-  if (quotesQuery.isPending || (symbol !== undefined && candlesQuery.isPending)) {
-    chartState = <p className="landing-chart-state" role="status">Connecting to the market feed…</p>;
-  } else if (quotesQuery.isError || (symbol !== undefined && candlesQuery.isError)) {
-    chartState = <p className="landing-chart-state landing-error" role="alert">Chart data could not be loaded. Try again in a moment.</p>;
-  } else if (quote === undefined) {
-    chartState = <p className="landing-chart-state">A chart will appear when market quotes are available.</p>;
-  } else if (candles.length === 0) {
-    chartState = <EmptyChartState symbol={quote.symbol} />;
-  } else {
-    chartState = (
-      <LivePriceChart
-        ariaLabel={`${quote.symbol} daily closing prices from real market candle data`}
-        data={chartData}
-      />
-    );
-  }
-
   return (
-    <aside aria-label="Live market preview" className="landing-market-panel">
+    <aside aria-label="Illustrative workspace preview, not account data" className="landing-market-panel">
       <div className="landing-market-head">
         <div>
-          <p className="landing-overline">Market watch / 01</p>
-          {quote === undefined ? (
-            <h2 className="landing-market-name">Daily market view</h2>
-          ) : (
-            <>
-              <h2 className="landing-market-name">{quote.symbol}</h2>
-              <p className="landing-market-company">{quote.name}</p>
-            </>
-          )}
+          <p className="landing-overline">Workspace preview / illustrative</p>
+          <h2 className="landing-market-name">Practice portfolio</h2>
+          <p className="landing-market-company">Example view · not account data</p>
         </div>
-        <span className="landing-market-live"><span aria-hidden="true" />LIVE FEED</span>
+        <span className="landing-market-live"><span aria-hidden="true" />SAMPLE VIEW</span>
       </div>
       <div className="landing-market-price">
-        {quote === undefined ? "—" : formatPaise(quote.pricePaise)}
-        {quote !== undefined && (
-          <span className={quote.changePaise >= 0 ? "is-up" : "is-down"}>
-            {quote.changePaise > 0 ? "+" : quote.changePaise < 0 ? "−" : ""}
-            {formatPaise(Math.abs(quote.changePaise))}
-            <span className="landing-price-context"> today</span>
-          </span>
-        )}
+        ₹1,24,680
+        <span className="landing-preview-caption">Illustrative virtual balance</span>
       </div>
-      <div className="landing-chart" aria-live="polite">{chartState}</div>
+      <div aria-hidden="true" className="landing-chart landing-preview-chart">
+        <div className="landing-preview-grid" />
+        <svg viewBox="0 0 520 190" preserveAspectRatio="none">
+          <defs><linearGradient id="preview-fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#69cfff" stopOpacity=".24" /><stop offset="1" stopColor="#69cfff" stopOpacity="0" /></linearGradient></defs>
+          <path className="landing-preview-area" d="M0 151 C35 138 52 154 83 127 S132 129 158 109 S195 127 222 91 S260 100 287 79 S326 104 355 65 S397 82 426 53 S475 60 520 23 V190 H0Z" />
+          <path className="landing-preview-line" d="M0 151 C35 138 52 154 83 127 S132 129 158 109 S195 127 222 91 S260 100 287 79 S326 104 355 65 S397 82 426 53 S475 60 520 23" />
+        </svg>
+        <div className="landing-preview-chart-labels"><span>MON</span><span>WED</span><span>FRI</span><span>SAMPLE</span></div>
+      </div>
+      <div className="landing-preview-holdings">
+        <div><span>Virtual holdings</span><strong>3 positions</strong></div>
+        <div><span>Orders</span><strong>Practice only</strong></div>
+      </div>
       <div className="landing-chart-foot">
-        <span>DAILY CLOSE · 48 SESSIONS</span>
-        <span>SIMULATED ENVIRONMENT</span>
+        <span>ILLUSTRATIVE DATA</span>
+        <span>NOT CONNECTED TO YOUR ACCOUNT</span>
       </div>
     </aside>
   );
@@ -208,8 +152,7 @@ export function LandingPage() {
       <header className="landing-header">
         <nav aria-label="Main navigation" className="landing-nav">
           <Link aria-label="TradeWise home" className="landing-brand" to="/">
-            <span aria-hidden="true" className="landing-brand-mark">T<span>W</span></span>
-            <span>Trade<span>Wise</span></span>
+            <TradeWiseLogo className="landing-logo" />
           </Link>
           <div className="landing-nav-links">
             <a href="#features">Features</a>
@@ -229,8 +172,8 @@ export function LandingPage() {
         <section aria-labelledby="hero-title" className="landing-hero landing-shell">
           <div className="landing-hero-copy">
             <p className="landing-kicker"><span aria-hidden="true" />A practice space for the curious</p>
-            <h1 aria-label="Practice trading. Understand every trade." id="hero-title">
-              Practice trading.<br /><span>Understand every trade.</span>
+            <h1 aria-label="Trade smarter. See the market differently." id="hero-title">
+              Trade smarter.<br /><span>See the market differently.</span>
             </h1>
             <p className="landing-hero-description">
               Learn how orders, prices, and risk work—using virtual funds in a market simulator built for practice, not promises.
@@ -321,13 +264,28 @@ export function LandingPage() {
             ))}
           </div>
         </section>
+
+        <section aria-labelledby="landing-final-cta-title" className="landing-final-cta landing-shell">
+          <p className="landing-overline">Your next move / 05</p>
+          <h2 id="landing-final-cta-title">Build your market instincts.<br /><span>One practice trade at a time.</span></h2>
+          <p>Explore the app with virtual money. No deposits, real trades, or investment advice.</p>
+          <div className="landing-final-cta-actions">
+            <Link className="landing-primary-cta" to={primaryPath}>
+              {user === null ? "Start practicing" : "Open your dashboard"}
+              <span aria-hidden="true">→</span>
+            </Link>
+            <Link className="landing-secondary-cta" to={user === null ? "/login" : "/app/markets"}>
+              {user === null ? "Already have an account? Sign in" : "Explore markets"}
+              <span aria-hidden="true">↗</span>
+            </Link>
+          </div>
+        </section>
       </main>
 
       <footer className="landing-footer">
         <div className="landing-shell landing-footer-inner">
           <Link aria-label="TradeWise home" className="landing-brand" to="/">
-            <span aria-hidden="true" className="landing-brand-mark">T<span>W</span></span>
-            <span>Trade<span>Wise</span></span>
+            <TradeWiseLogo className="landing-logo" />
           </Link>
           <p>Simulated trading with virtual money. Not financial advice.</p>
           <span className="landing-footer-meta">BUILT FOR PRACTICE · NEVER A BROKER</span>

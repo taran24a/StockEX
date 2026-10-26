@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "./auth";
 import { ProtectedRoute } from "./components/routes/ProtectedRoute";
 import { RoleRoute } from "./components/routes/RoleRoute";
 import { ErrorBoundary, Spinner } from "./components/ui";
+import { TradeWiseLogo } from "./components/TradeWiseLogo";
 import { LandingPage } from "./LandingPage";
 import { WorkspaceLayout } from "./WorkspaceLayout";
 
@@ -81,8 +82,7 @@ function AuthPage({ mode }: { mode: "login" | "register" }) {
       <div className="auth-layout">
         <section aria-label="TradeWise account access" className="auth-main">
           <Link aria-label="TradeWise home" className="auth-brand" to="/">
-            <span aria-hidden="true" className="auth-brand-mark">T<span>W</span></span>
-            <span>TradeWise</span>
+            <TradeWiseLogo className="auth-logo" />
           </Link>
           <div className="auth-form-wrap">
             {error !== null && !storageWarning && <p className="auth-session-error" role="alert">{error}</p>}
