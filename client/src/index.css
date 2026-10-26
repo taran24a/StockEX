@@ -1334,6 +1334,20 @@ html {
   border-radius: 6px;
 }
 
+.auth-google-button,
+.auth-google-unconfigured {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+}
+
+.auth-google-button > div { margin-inline: auto; }
+.auth-google-unconfigured { opacity: .7; }
+.auth-divider { display: flex; align-items: center; gap: 12px; color: #7b8495; font-size: .8rem; }
+.auth-divider::before,
+.auth-divider::after { content: ""; flex: 1; height: 1px; background: #e3e7ee; }
+
 .auth-demo-button {
   border-color: #3b4a54;
   background: rgb(15 23 32 / 72%);

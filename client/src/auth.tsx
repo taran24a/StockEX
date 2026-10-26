@@ -19,6 +19,7 @@ interface AuthContextValue {
   ready: boolean;
   error: string | null;
   signIn(input: LoginRequest): Promise<void>;
+  signInWithGoogle(credential: string): Promise<void>;
   register(input: RegisterRequest): Promise<void>;
   uploadAvatar(file: File): Promise<void>;
   updateUser(user: User): void;
@@ -126,6 +127,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setReady(true);
   }
 
+  async function establishGoogleSession(credential: string): Promise<void> {
+    const session = await apiRequest("/api/auth/google", AuthResponseSchema, undefined, {
+      method: "POST",
+      body: JSON.stringify({ credential })
+    });
+    try {
+      window.sessionStorage.setItem(SESSION_TOKEN_KEY, session.token);
+    } catch {
+      setError("Your session is active, but it could not be saved in this browser. It will end when this tab is closed or reloaded.");
+    }
+    setToken(session.token);
+    setUser(session.user);
+    setAvatarUrl(null);
+    setReady(true);
+  }
+
   function signOut(): void {
     removeSessionToken();
     setToken(null);
@@ -155,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ready,
     error,
     signIn: (input) => establishSession("/api/auth/login", input),
+    signInWithGoogle: establishGoogleSession,
     register: (input) => establishSession("/api/auth/register", input),
     uploadAvatar,
     updateUser: (updatedUser) => setUser(updatedUser),

@@ -48,7 +48,7 @@ function getReturnPath(state: unknown): string {
 }
 
 function AuthPage({ mode }: { mode: "login" | "register" }) {
-  const { user, ready, error, signIn, register } = useAuth();
+  const { user, ready, error, signIn, signInWithGoogle, register } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const returnPath = getReturnPath(location.state);
@@ -71,6 +71,11 @@ function AuthPage({ mode }: { mode: "login" | "register" }) {
     navigate("/app/dashboard", { replace: true });
   }
 
+  async function handleGoogleSignIn(credential: string): Promise<void> {
+    await signInWithGoogle(credential);
+    navigate(mode === "login" ? returnPath : "/app/dashboard", { replace: true });
+  }
+
   return (
     <main className="auth-page">
       <div className="auth-layout">
@@ -86,6 +91,7 @@ function AuthPage({ mode }: { mode: "login" | "register" }) {
               initialMode={mode}
               onLogin={handleLogin}
               onRegister={handleRegister}
+              onGoogleSignIn={handleGoogleSignIn}
               showModeToggle={false}
             />
             <p className="auth-switch">

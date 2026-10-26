@@ -18,6 +18,7 @@ import { validatedBody, validateBody } from "../http-validation.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { withTransaction } from "../db/transaction.js";
 import { createAvatarRouter } from "./avatar.js";
+import { randomBytes } from "node:crypto";
 
 interface UserRow {
   id: string;
@@ -116,10 +117,75 @@ export function createAuthRouter(pool: Pool, environment: Environment, objectSto
       [input.email.toLowerCase()]
     );
     const user = result.rows[0];
-    if (user?.password_hash === undefined || !(await bcrypt.compare(input.password, user.password_hash))) {
+    if (user?.password_hash == null || !(await bcrypt.compare(input.password, user.password_hash))) {
       throw new ApiError(401, "INVALID_CREDENTIALS", "Email or password is incorrect");
     }
     response.json(authResponse(user, environment.JWT_SECRET));
+  });
+
+  router.post("/google", async (request, response) => {
+    if (!environment.GOOGLE_CLIENT_ID) {
+      throw new ApiError(503, "GOOGLE_SIGN_IN_NOT_CONFIGURED", "Google sign-in is not configured yet");
+    }
+    const idToken = typeof request.body?.credential === "string" ? request.body.credential : "";
+    if (!idToken || idToken.length > 10_000) {
+      throw new ApiError(400, "INVALID_GOOGLE_CREDENTIAL", "Google did not provide a valid sign-in credential");
+    }
+    const googleResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+    if (!googleResponse.ok) {
+      throw new ApiError(401, "INVALID_GOOGLE_CREDENTIAL", "Google sign-in could not verify your account");
+    }
+    const claims: unknown = await googleResponse.json();
+    if (typeof claims !== "object" || claims === null) {
+      throw new ApiError(401, "INVALID_GOOGLE_CREDENTIAL", "Google sign-in could not verify your account");
+    }
+    const payload = claims as Record<string, unknown>;
+    const issuerValid = payload.iss === "accounts.google.com" || payload.iss === "https://accounts.google.com";
+    const expiresAt = Number(payload.exp);
+    if (payload.aud !== environment.GOOGLE_CLIENT_ID || !issuerValid || !Number.isFinite(expiresAt) || expiresAt <= Date.now() / 1000 ||
+        payload.email_verified !== "true" || typeof payload.email !== "string" || typeof payload.sub !== "string" ||
+        typeof payload.name !== "string") {
+      throw new ApiError(401, "INVALID_GOOGLE_CREDENTIAL", "Google sign-in could not verify your account");
+    }
+
+    const email = payload.email.toLowerCase();
+    const googleSub = payload.sub;
+    const existing = await pool.query<UserRow>(
+      `SELECT id, email, display_name, role FROM users WHERE google_sub = $1 OR email = $2 LIMIT 1`,
+      [googleSub, email]
+    );
+    let user = existing.rows[0];
+    if (user !== undefined) {
+      await pool.query("UPDATE users SET google_sub = $1 WHERE id = $2 AND google_sub IS NULL", [googleSub, user.id]);
+    } else {
+      const displayName = xss(payload.name, { whiteList: {}, stripIgnoreTag: true, stripIgnoreTagBody: ["script", "style"] }).trim().slice(0, 60) || "Google user";
+      const randomPasswordHash = await bcrypt.hash(randomBytes(32).toString("hex"), 12);
+      try {
+        user = await withTransaction(pool, async (client) => {
+          const inserted = await client.query<UserRow>(
+            `INSERT INTO users (email, display_name, password_hash, google_sub)
+             VALUES ($1, $2, $3, $4) RETURNING id, email, display_name, role`,
+            [email, displayName, randomPasswordHash, googleSub]
+          );
+          const createdUser = inserted.rows[0];
+          if (createdUser === undefined) throw new Error("Google user insert returned no row");
+          await client.query("INSERT INTO wallets (user_id, balance_paise) VALUES ($1, $2)", [createdUser.id, 100_000_000]);
+          await client.query(
+            `INSERT INTO ledger_entries (account_id, entry_type, amount, balance_after)
+             SELECT account.id, 'deposit', account.cash_balance, account.cash_balance FROM accounts AS account WHERE account.user_id = $1`,
+            [createdUser.id]
+          );
+          return createdUser;
+        });
+      } catch (error) {
+        if (typeof error === "object" && error !== null && "code" in error && error.code === "23505") {
+          throw new ApiError(409, "GOOGLE_ACCOUNT_LINK_CONFLICT", "This Google account is already linked. Please sign in with your existing method.");
+        }
+        throw error;
+      }
+    }
+    if (user === undefined) throw new ApiError(500, "AUTHENTICATION_FAILED", "Google sign-in could not create a session");
+    response.status(existing.rows[0] === undefined ? 201 : 200).json(authResponse(user, environment.JWT_SECRET));
   });
 
   router.get("/me", requireAuth, async (request, response) => {

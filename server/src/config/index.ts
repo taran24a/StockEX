@@ -15,6 +15,7 @@ export const EnvironmentSchema = z.object({
   OLLAMA_BASE_URL: z.string().url().default("http://localhost:11434"),
   OLLAMA_MODEL: z.string().trim().min(1).max(128).default("llama3.2:3b"),
   CLIENT_ORIGIN: z.string().url().default("http://localhost:5173"),
+  GOOGLE_CLIENT_ID: z.string().trim().default(""),
   MINIO_ENDPOINT: z.string().default("localhost"),
   MINIO_PORT: z.coerce.number().int().min(1).max(65535).default(9000),
   MINIO_USE_SSL: z.enum(["true", "false"]).default("false").transform((value) => value === "true"),

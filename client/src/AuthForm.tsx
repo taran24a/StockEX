@@ -4,14 +4,54 @@ import {
   type LoginRequest,
   type RegisterRequest
 } from "@tradewise/shared";
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, Input } from "./components/ui";
 
 interface AuthFormProps {
   onLogin(input: LoginRequest): Promise<void>;
   onRegister(input: RegisterRequest): Promise<void>;
+  onGoogleSignIn(credential: string): Promise<void>;
   initialMode?: "login" | "register";
   showModeToggle?: boolean;
+}
+
+interface GoogleCredentialResponse { credential: string }
+interface GoogleIdentity {
+  initialize(options: { client_id: string; callback(response: GoogleCredentialResponse): void }): void;
+  renderButton(element: HTMLElement, options: { theme: string; size: string; shape: string; width: number; text: string }): void;
+}
+declare global { interface Window { google?: { accounts: { id: GoogleIdentity } } } }
+
+function GoogleSignInButton({ onCredential, onError }: { onCredential(credential: string): Promise<void>; onError(error: string): void }) {
+  const container = useRef<HTMLDivElement>(null);
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() ?? "";
+  useEffect(() => {
+    if (!clientId || container.current === null) return;
+    let active = true;
+    const render = () => {
+      if (!active || container.current === null || !window.google) return;
+      window.google.accounts.id.initialize({ client_id: clientId, callback: (result) => {
+        void onCredential(result.credential).catch((error: unknown) => onError(error instanceof Error ? error.message : "Google sign-in failed"));
+      }});
+      window.google.accounts.id.renderButton(container.current, { theme: "outline", size: "large", shape: "pill", width: Math.max(250, container.current.clientWidth), text: "continue_with" });
+    };
+    const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+    if (window.google) render();
+    else if (existingScript) existingScript.addEventListener("load", render, { once: true });
+    else {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = render;
+      script.onerror = () => onError("Google sign-in could not load. Check your internet connection.");
+      document.head.appendChild(script);
+    }
+    return () => { active = false; };
+  }, [clientId, onCredential, onError]);
+  return clientId
+    ? <div aria-label="Sign in with Google" className="auth-google-button" ref={container} />
+    : <Button className="auth-google-unconfigured" disabled type="button" variant="secondary">Google sign-in · setup required</Button>;
 }
 
 type FieldErrors = Partial<Record<"email" | "displayName" | "password", string>>;
@@ -43,6 +83,7 @@ function passwordStrength(password: string): { label: string; value: number; wid
 export function AuthForm({
   onLogin,
   onRegister,
+  onGoogleSignIn,
   initialMode = "login",
   showModeToggle = true
 }: AuthFormProps) {
@@ -102,6 +143,13 @@ export function AuthForm({
   }
 
   const strength = passwordStrength(password);
+  const handleGoogleCredential = useCallback(async (credential: string): Promise<void> => {
+    setError(null);
+    setSubmitting(true);
+    try { await onGoogleSignIn(credential); }
+    finally { setSubmitting(false); }
+  }, [onGoogleSignIn]);
+  const handleGoogleError = useCallback((message: string): void => { setError(message); }, []);
 
   return (
     <form className="auth-form" noValidate onSubmit={submit}>
@@ -203,6 +251,8 @@ export function AuthForm({
         </Button>
       )}
       {submitting && <p className="auth-submitting" role="status">Securely checking your details…</p>}
+      <div className="auth-divider"><span>or</span></div>
+      <GoogleSignInButton onCredential={handleGoogleCredential} onError={handleGoogleError} />
       <Button
         className="auth-submit"
         disabled={submitting}
